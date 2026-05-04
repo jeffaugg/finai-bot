@@ -72,7 +72,7 @@ GEMINI_API_KEY="CHAVE_DO_GOOGLE_AI_STUDIO"
 Para testar o bot rodando no seu próprio terminal antes de enviar para a nuvem:
 
 ```bash
-npx ts-node local.ts
+pnpm start
 ```
 
 ## 👨‍💻 Autoria
