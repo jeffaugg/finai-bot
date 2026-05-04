@@ -2,6 +2,11 @@ import { ai } from '../config/clients';
 import { GeminiExtractionSchema, GeminiExtraction } from '../types';
 
 export class ExtractionService {
+    /**
+   * Extrai dados financeiros de um texto
+   * @param text - O texto do qual extrair dados
+   * @returns Os dados financeiros extraídos
+   */
   async extractFromText(text: string): Promise<GeminiExtraction> {
     const prompt = `Extraia os dados financeiros do seguinte texto: "${text}"`;
     

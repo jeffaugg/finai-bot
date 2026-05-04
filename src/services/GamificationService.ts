@@ -12,6 +12,12 @@ export class GamificationService {
     this.transactionRepo = new TransactionRepository();
   }
 
+  /**
+   * Processa um evento financeiro extraído do texto do usuário e atualiza o perfil gamificado
+    * @param telegramId - O ID do Telegram do usuário
+    * @param data - Os dados extraídos do texto, incluindo intenção, valor, categoria e data
+    * @returns Uma mensagem de feedback personalizada para o usuário com base no evento processado
+   */
   async processFinancialEvent(telegramId: number, data: GeminiExtraction): Promise<string> {
     const user = await this.userRepo.findByTelegramId(telegramId);
     if (!user) {
@@ -31,7 +37,12 @@ export class GamificationService {
     }
   }
 
-
+  /**
+   * Lida com eventos de entrada de dinheiro (renda extra) e atualiza a Reserva de Sucesso do usuário
+   * @param user - O perfil do usuário para o qual o evento está sendo processado
+   * @param data - Os dados extraídos do texto
+   * @returns A mensagem de feedback personalizada para o usuário
+   */
   private async handleInflow(user: User, data: GeminiExtraction): Promise<string> {
     const newReserve = Number(user.success_reserve) + data.amount;
     
@@ -50,6 +61,13 @@ export class GamificationService {
     return `🎉 Renda extra de R$ ${data.amount.toFixed(2)} registrada!\nEsse valor foi direto para sua Reserva de Sucesso, que agora é de R$ ${newReserve.toFixed(2)}. Proteja seu colchão! 🛡️`;
   }
 
+  /**
+   * Lida com atualizações de salário e recalcula o limite diário do usuário
+   * @param user - O perfil do usuário para o qual o evento está sendo processado
+   * @param data - Os dados extraídos do texto
+   * @returns A mensagem de feedback personalizada para o usuário
+   */
+
   private async handleSalaryUpdate(user: User, data: GeminiExtraction): Promise<string> {
     const novaRenda = data.amount;
     const despesasFixas = Number(user.fixed_expenses);
@@ -67,6 +85,13 @@ export class GamificationService {
     return `📈 Renda atualizada para R$ ${novaRenda.toFixed(2)}!\nSeu novo limite diário recalculado para manter sua meta de poupança agora é R$ ${novoLimiteDiario.toFixed(2)}.`;
   }
 
+
+  /**
+   * Lida com eventos de despesa, registra a transação e fornece feedback sobre o limite diário
+   * @param user - O perfil do usuário para o qual o evento está sendo processado
+   * @param data - Os dados extraídos do texto
+   * @returns A mensagem de feedback personalizada para o usuário
+   */
   private async handleExpense(user: User, data: GeminiExtraction): Promise<string> {
     await this.transactionRepo.create({
       user_id: user.id,

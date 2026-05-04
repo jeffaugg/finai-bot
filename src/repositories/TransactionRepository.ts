@@ -2,6 +2,11 @@ import { supabase } from '../config/clients';
 import { Transaction } from '../types';
 
 export class TransactionRepository {
+  /**
+   * Cria uma nova transação no banco de dados
+   * @param transactionData - Dados parciais da transação a ser criada
+   * @returns A transação criada com todos os campos preenchidos
+   */
   async create(transactionData: Partial<Transaction>): Promise<Transaction> {
     const { data, error } = await supabase
       .from('transactions')
@@ -17,6 +22,11 @@ export class TransactionRepository {
     return data as Transaction;
   }
 
+  /**
+   * Calcula o total de despesas do dia para um usuário específico
+   * @param userId - O ID do usuário
+   * @returns O total de despesas do dia
+   */
   async getDailyExpenseTotal(userId: string): Promise<number> {
     const today = new Date().toISOString().split('T')[0]; 
     
