@@ -1,0 +1,20 @@
+import { VercelRequest, VercelResponse } from '@vercel/node';
+import { bot } from '../src/config/clients';
+import { setupBotCommands } from '../src/controllers/BotController';
+
+setupBotCommands();
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'POST') {
+    try {
+      await bot.handleUpdate(req.body);
+      
+      return res.status(200).send('OK');
+    } catch (error) {
+      console.error('Erro crítico no processamento do webhook:', error);
+      return res.status(200).send('Error Processed');
+    }
+  } else {
+    return res.status(200).send('FinAI Bot Webhook está ativo e operante. 🚀');
+  }
+}

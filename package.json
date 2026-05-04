@@ -18,6 +18,7 @@
   "dependencies": {
     "@google/genai": "^1.51.0",
     "@supabase/supabase-js": "^2.105.1",
+    "@vercel/node": "^5.7.15",
     "dotenv": "^17.4.2",
     "telegraf": "^4.16.3",
     "zod": "^4.4.1"
