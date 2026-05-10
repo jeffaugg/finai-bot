@@ -1,12 +1,8 @@
 import { supabase } from '../config/clients';
-import { Transaction } from '../types';
+import { Transaction, TransactionSchema } from '../types';
+import { DatabaseError } from '../types/errors';
 
 export class TransactionRepository {
-  /**
-   * Cria uma nova transação no banco de dados
-   * @param transactionData - Dados parciais da transação a ser criada
-   * @returns A transação criada com todos os campos preenchidos
-   */
   async create(transactionData: Partial<Transaction>): Promise<Transaction> {
     const { data, error } = await supabase
       .from('transactions')
@@ -14,22 +10,28 @@ export class TransactionRepository {
       .select()
       .single();
 
-    if (error) {
-      console.error('Falha no Supabase:', error);
-      throw new Error('Não foi possível registrar a transação no banco de dados.');
+    if (error || !data) {
+      throw new DatabaseError(error?.message ?? 'Falha ao inserir transação');
     }
 
-    return data as Transaction;
+    return TransactionSchema.parse(data);
   }
 
-  /**
-   * Calcula o total de despesas do dia para um usuário específico
-   * @param userId - O ID do usuário
-   * @returns O total de despesas do dia
-   */
+  async softDelete(transactionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('transactions')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', transactionId)
+      .is('deleted_at', null);
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+  }
+
   async getDailyExpenseTotal(userId: string): Promise<number> {
     const today = new Date().toISOString().split('T')[0]; 
-    
+
     const { data, error } = await supabase
       .from('transactions')
       .select('amount')
@@ -40,11 +42,40 @@ export class TransactionRepository {
       .lte('date', `${today}T23:59:59.999Z`);
 
     if (error) {
-      console.error('Erro ao buscar total diário:', error);
-      throw new Error('Falha ao calcular o limite restante do dia.');
+      throw new DatabaseError(error.message);
     }
 
-    const total = data.reduce((acc, curr) => acc + Number(curr.amount), 0);
-    return total;
+    return (data ?? []).reduce((acc, curr) => acc + Number(curr.amount), 0);
+  }
+
+  async getMonthlySummary(
+    userId: string,
+    year: number,
+    month: number
+  ): Promise<{ category: string; total: number }[]> {
+    const start = `${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`;
+    const end = new Date(year, month, 1).toISOString();
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('category, amount')
+      .eq('user_id', userId)
+      .eq('type', 'EXPENSE')
+      .is('deleted_at', null)
+      .gte('date', start)
+      .lt('date', end);
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    const totals = new Map<string, number>();
+    for (const t of data ?? []) {
+      totals.set(t.category, (totals.get(t.category) ?? 0) + Number(t.amount));
+    }
+
+    return Array.from(totals.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
   }
 }

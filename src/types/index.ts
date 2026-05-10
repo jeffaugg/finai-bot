@@ -26,6 +26,32 @@ export interface Transaction {
   deleted_at: Date | null;
 }
 
+export const UserSchema = z.object({
+  id: z.uuid(),
+  telegram_id: z.coerce.number(),
+  monthly_income: z.coerce.number(),
+  fixed_expenses: z.coerce.number(),
+  saving_percentage: z.coerce.number(),
+  daily_limit: z.coerce.number(),
+  success_reserve: z.coerce.number(),
+  current_streak: z.coerce.number(),
+  max_streak: z.coerce.number(),
+  snooze_until: z.coerce.date().nullable(),
+  last_closed_date: z.coerce.date().nullable(),
+  created_at: z.coerce.date(),
+});
+
+export const TransactionSchema = z.object({
+  id: z.uuid(),
+  user_id: z.uuid(),
+  amount: z.coerce.number(),
+  category: z.string(),
+  type: z.enum(['EXPENSE', 'INFLOW']),
+  raw_text: z.string(),
+  date: z.coerce.date(),
+  deleted_at: z.coerce.date().nullable(),
+});
+
 export const IntentEnum = z.enum(['EXPENSE', 'INFLOW', 'UPDATE_SALARY']);
 
 export const GeminiExtractionSchema = z.object({
@@ -44,3 +70,8 @@ export const GeminiExtractionSchema = z.object({
 });
 
 export type GeminiExtraction = z.infer<typeof GeminiExtractionSchema>;
+
+export interface FinancialEventResult {
+  message: string;
+  transactionId?: string;
+}

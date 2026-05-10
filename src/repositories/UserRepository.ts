@@ -1,12 +1,8 @@
 import { supabase } from '../config/clients';
-import { User } from '../types';
+import { User, UserSchema } from '../types';
+import { DatabaseError } from '../types/errors';
 
 export class UserRepository {
-  /**
-   * Busca um usuário pelo seu ID do Telegram
-   * @param telegramId - O ID do Telegram do usuário
-   * @returns O usuário encontrado ou null se não existir
-   */
   async findByTelegramId(telegramId: number): Promise<User | null> {
     const { data, error } = await supabase
       .from('users')
@@ -15,14 +11,9 @@ export class UserRepository {
       .single();
 
     if (error || !data) return null;
-    return data as User;
+    return UserSchema.parse(data);
   }
-  
-  /**
-   * Cria um novo usuário no banco de dados
-   * @param userData - Dados parciais do usuário a ser criado
-   * @returns O usuário criado com todos os campos preenchidos
-   */
+
   async createUser(userData: Partial<User>): Promise<User> {
     const { data, error } = await supabase
       .from('users')
@@ -30,16 +21,12 @@ export class UserRepository {
       .select()
       .single();
 
-    if (error) throw new Error(`Erro ao criar usuário: ${error.message}`);
-    return data as User;
+    if (error || !data) {
+      throw new DatabaseError(error?.message ?? 'Falha ao criar usuário');
+    }
+    return UserSchema.parse(data);
   }
 
-  /**
-   * Atualiza um usuário existente no banco de dados
-   * @param userId - O ID do usuário a ser atualizado
-   * @param updateData - Dados parciais do usuário a serem atualizados
-   * @returns O usuário atualizado com todos os campos preenchidos
-   */
   async updateUser(userId: string, updateData: Partial<User>): Promise<User> {
     const { data, error } = await supabase
       .from('users')
@@ -48,11 +35,52 @@ export class UserRepository {
       .select()
       .single();
 
+    if (error || !data) {
+      throw new DatabaseError(error?.message ?? 'Falha ao atualizar usuário');
+    }
+    return UserSchema.parse(data);
+  }
+
+  async findAllActiveUsers(): Promise<User[]> {
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .or(`last_closed_date.is.null,last_closed_date.lt.${today}`);
+
     if (error) {
-      console.error('Erro ao atualizar usuário no Supabase:', error);
-      throw new Error(`Falha ao atualizar os dados do usuário: ${error.message}`);
+      throw new DatabaseError(error.message);
     }
 
-    return data as User;
+    return (data ?? []).map((u) => UserSchema.parse(u));
+  }
+
+  async findUsersWithoutTodayExpenses(): Promise<User[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .or(`snooze_until.is.null,snooze_until.lt.${now}`);
+
+    if (usersError) {
+      throw new DatabaseError(usersError.message);
+    }
+
+    const { data: todayExpenses } = await supabase
+      .from('transactions')
+      .select('user_id')
+      .eq('type', 'EXPENSE')
+      .is('deleted_at', null)
+      .gte('date', `${today}T00:00:00.000Z`)
+      .lte('date', `${today}T23:59:59.999Z`);
+
+    const usersWithExpenses = new Set((todayExpenses ?? []).map((t) => t.user_id));
+
+    return (users ?? [])
+      .filter((u) => !usersWithExpenses.has(u.id))
+      .map((u) => UserSchema.parse(u));
   }
 }

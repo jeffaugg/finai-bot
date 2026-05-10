@@ -5,13 +5,19 @@ import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Variável de ambiente obrigatória não definida: ${key}`);
+  return value;
+}
+
 export const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
+  requireEnv('SUPABASE_URL'),
+  requireEnv('SUPABASE_SERVICE_KEY')
 );
 
-export const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY! 
+export const ai = new GoogleGenAI({
+  apiKey: requireEnv('GEMINI_API_KEY'),
 });
 
-export const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
+export const bot = new Telegraf(requireEnv('TELEGRAM_BOT_TOKEN'));
