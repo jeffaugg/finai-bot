@@ -27,6 +27,7 @@ export interface User {
   onboarding_step: OnboardingStep;
   timezone: string;
   reminders_enabled: boolean;
+  onboarding_nudged_at: Date | null;
 }
 
 export interface Transaction {
@@ -56,6 +57,7 @@ export const UserSchema = z.object({
   onboarding_step: OnboardingStep,
   timezone: z.string(),
   reminders_enabled: z.boolean(),
+  onboarding_nudged_at: z.coerce.date().nullable(),
 });
 
 export const TransactionSchema = z.object({

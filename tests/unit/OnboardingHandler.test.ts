@@ -19,6 +19,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     onboarding_step: 'awaiting_salary',
     timezone: 'America/Sao_Paulo',
     reminders_enabled: true,
+    onboarding_nudged_at: null,
     ...overrides,
   };
 }

@@ -1,7 +1,6 @@
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { FinancialEventResult, GeminiExtraction, User } from '../types';
-import { RAW_TEXT_AI_PROCESSED } from '../types/constants';
 import { DateService } from './DateService';
 
 const dateService = new DateService();
@@ -14,7 +13,8 @@ export class GamificationService {
 
   async processFinancialEvent(
     telegramId: number,
-    data: GeminiExtraction
+    data: GeminiExtraction,
+    rawText: string
   ): Promise<FinancialEventResult> {
     const user = await this.userRepo.findByTelegramId(telegramId);
     if (!user) {
@@ -26,17 +26,21 @@ export class GamificationService {
 
     switch (data.intent) {
       case 'INFLOW':
-        return this.handleInflow(user, data);
+        return this.handleInflow(user, data, rawText);
 
       case 'UPDATE_SALARY':
         return this.handleSalaryUpdate(user, data);
 
       case 'EXPENSE':
-        return this.handleExpense(user, data);
+        return this.handleExpense(user, data, rawText);
     }
   }
 
-  private async handleInflow(user: User, data: GeminiExtraction): Promise<FinancialEventResult> {
+  private async handleInflow(
+    user: User,
+    data: GeminiExtraction,
+    rawText: string
+  ): Promise<FinancialEventResult> {
     const newReserve = Number(user.success_reserve) + data.amount;
 
     await this.transactionRepo.create({
@@ -44,7 +48,7 @@ export class GamificationService {
       amount: data.amount,
       category: data.category,
       type: 'INFLOW',
-      raw_text: RAW_TEXT_AI_PROCESSED,
+      raw_text: rawText,
       date: new Date(data.date_iso),
       deleted_at: null,
     });
@@ -82,13 +86,17 @@ export class GamificationService {
     };
   }
 
-  private async handleExpense(user: User, data: GeminiExtraction): Promise<FinancialEventResult> {
+  private async handleExpense(
+    user: User,
+    data: GeminiExtraction,
+    rawText: string
+  ): Promise<FinancialEventResult> {
     const transaction = await this.transactionRepo.create({
       user_id: user.id,
       amount: data.amount,
       category: data.category,
       type: 'EXPENSE',
-      raw_text: RAW_TEXT_AI_PROCESSED,
+      raw_text: rawText,
       date: new Date(data.date_iso),
       deleted_at: null,
     });

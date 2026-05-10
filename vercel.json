@@ -11,6 +11,9 @@
     },
     "api/cron/monthly-report.ts": {
       "maxDuration": 60
+    },
+    "api/cron/onboarding-nudge.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -25,6 +28,10 @@
     {
       "path": "/api/cron/monthly-report",
       "schedule": "0 8 1 * *"
+    },
+    {
+      "path": "/api/cron/onboarding-nudge",
+      "schedule": "0 21 * * *"
     }
   ]
 }

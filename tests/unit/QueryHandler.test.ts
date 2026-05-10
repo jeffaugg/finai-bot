@@ -19,6 +19,7 @@ function makeUser(): User {
     onboarding_step: 'completed',
     timezone: 'America/Sao_Paulo',
     reminders_enabled: true,
+    onboarding_nudged_at: null,
   };
 }
 

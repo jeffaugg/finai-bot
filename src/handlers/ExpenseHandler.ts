@@ -15,7 +15,11 @@ export class ExpenseHandler {
       await ctx.sendChatAction('typing');
 
       const extracted = await this.extractionService.extractFromText(text);
-      const result = await this.gamificationService.processFinancialEvent(user.telegram_id, extracted);
+      const result = await this.gamificationService.processFinancialEvent(
+        user.telegram_id,
+        extracted,
+        text
+      );
 
       if (result.transactionId) {
         await ctx.reply(

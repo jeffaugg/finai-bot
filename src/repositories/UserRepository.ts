@@ -66,6 +66,8 @@ export class UserRepository {
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*')
+      .eq('reminders_enabled', true)
+      .eq('onboarding_step', 'completed')
       .or(`snooze_until.is.null,snooze_until.lt.${now}`);
 
     if (usersError) {
@@ -85,5 +87,33 @@ export class UserRepository {
     return (users ?? [])
       .filter((u) => !usersWithExpenses.has(u.id))
       .map((u) => UserSchema.parse(u));
+  }
+
+  async findStaleOnboardingForNudge(hoursAgo: number): Promise<User[]> {
+    const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .neq('onboarding_step', 'completed')
+      .lt('created_at', cutoff)
+      .is('onboarding_nudged_at', null);
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    return (data ?? []).map((u) => UserSchema.parse(u));
+  }
+
+  async markOnboardingNudged(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('users')
+      .update({ onboarding_nudged_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
   }
 }
