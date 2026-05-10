@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+export const OnboardingStep = z.enum([
+  'not_started',
+  'awaiting_salary',
+  'awaiting_fixed_expenses',
+  'awaiting_saving_pct',
+  'awaiting_reminder_pref',
+  'completed',
+]);
+
+export type OnboardingStep = z.infer<typeof OnboardingStep>;
+
 export interface User {
   id: string;
   telegram_id: number;
@@ -13,6 +24,9 @@ export interface User {
   snooze_until: Date | null;
   last_closed_date: Date | null;
   created_at: Date;
+  onboarding_step: OnboardingStep;
+  timezone: string;
+  reminders_enabled: boolean;
 }
 
 export interface Transaction {
@@ -39,6 +53,9 @@ export const UserSchema = z.object({
   snooze_until: z.coerce.date().nullable(),
   last_closed_date: z.coerce.date().nullable(),
   created_at: z.coerce.date(),
+  onboarding_step: OnboardingStep,
+  timezone: z.string(),
+  reminders_enabled: z.boolean(),
 });
 
 export const TransactionSchema = z.object({

@@ -5,6 +5,7 @@ import { GamificationService } from '../services/GamificationService';
 import { ModerationService } from '../services/ModerationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
+import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { message } from 'telegraf/filters';
 import { AIExtractionError, AppError } from '../types/errors';
 
@@ -13,6 +14,7 @@ const transactionRepo = new TransactionRepository();
 const extractionService = new ExtractionService();
 const gamificationService = new GamificationService(userRepo, transactionRepo);
 const moderationService = new ModerationService();
+const onboardingHandler = new OnboardingHandler(userRepo);
 
 export const setupBotCommands = () => {
   bot.start(async (ctx) => {
@@ -32,12 +34,18 @@ export const setupBotCommands = () => {
           current_streak: 0,
           max_streak: 0,
         });
+        await onboardingHandler.startFromScratch(ctx, user);
+        return;
+      }
+
+      if (user.onboarding_step !== 'completed') {
+        await onboardingHandler.resume(ctx, user);
+        return;
       }
 
       await ctx.reply(
-        `Olá, ${ctx.from.first_name}! 🚀 Bem-vindo ao seu ecossistema financeiro gamificado.\n\n` +
-          `Para começar, me conte sobre a sua vida financeira em uma única mensagem, por exemplo:\n` +
-          `"Meu salário é 3000"`
+        `👋 Bem-vindo de volta, ${ctx.from.first_name}!\n` +
+          `Use /status para ver seu progresso ou me conte um gasto/ganho do dia.`
       );
     } catch (error) {
       console.error('Erro no Onboarding:', error);
@@ -145,15 +153,47 @@ export const setupBotCommands = () => {
     }
   });
 
+  bot.action(/^onboarding_reminders:(yes|no)$/, async (ctx) => {
+    try {
+      const accepted = ctx.match[1] === 'yes';
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (!user) {
+        await ctx.answerCbQuery('⚠️ Cadastro não encontrado.');
+        return;
+      }
+      await onboardingHandler.handleReminderChoice(ctx, user, accepted);
+    } catch (error) {
+      console.error('Erro no callback onboarding_reminders:', error);
+      await ctx.answerCbQuery('⚠️ Erro ao salvar preferência. Tente novamente.');
+    }
+  });
+
   bot.on(message('text'), async (ctx) => {
     const userText = ctx.message.text;
     const telegramId = ctx.from.id;
 
     if (userText.startsWith('/')) return;
 
+    const user = await userRepo.findByTelegramId(telegramId);
+
+    if (user && user.onboarding_step !== 'completed') {
+      try {
+        await onboardingHandler.continue(ctx, user, userText);
+      } catch (error) {
+        console.error('Erro no onboarding:', error);
+        await ctx.reply('⚠️ Tive um problema ao salvar. Tente novamente em instantes.');
+      }
+      return;
+    }
+
     const moderation = moderationService.preCheck(userText);
     if (!moderation.allowed) {
       await ctx.reply(moderation.cannedResponse!);
+      return;
+    }
+
+    if (!user) {
+      await ctx.reply('⚠️ Cadastro não encontrado. Digite /start para começar.');
       return;
     }
 
