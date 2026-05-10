@@ -1,6 +1,9 @@
 import { supabase } from '../config/clients';
 import { User, UserSchema } from '../types';
 import { DatabaseError } from '../types/errors';
+import { DateService } from '../services/DateService';
+
+const dateService = new DateService();
 
 export class UserRepository {
   async findByTelegramId(telegramId: number): Promise<User | null> {
@@ -42,12 +45,12 @@ export class UserRepository {
   }
 
   async findAllActiveUsers(): Promise<User[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const todayLocal = dateService.getCurrentLocalDateString();
 
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .or(`last_closed_date.is.null,last_closed_date.lt.${today}`);
+      .or(`last_closed_date.is.null,last_closed_date.lt.${todayLocal}`);
 
     if (error) {
       throw new DatabaseError(error.message);
@@ -57,7 +60,7 @@ export class UserRepository {
   }
 
   async findUsersWithoutTodayExpenses(): Promise<User[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const { start, end } = dateService.getDayBounds();
     const now = new Date().toISOString();
 
     const { data: users, error: usersError } = await supabase
@@ -74,8 +77,8 @@ export class UserRepository {
       .select('user_id')
       .eq('type', 'EXPENSE')
       .is('deleted_at', null)
-      .gte('date', `${today}T00:00:00.000Z`)
-      .lte('date', `${today}T23:59:59.999Z`);
+      .gte('date', start.toISOString())
+      .lte('date', end.toISOString());
 
     const usersWithExpenses = new Set((todayExpenses ?? []).map((t) => t.user_id));
 

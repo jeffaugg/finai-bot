@@ -1,6 +1,9 @@
 import { supabase } from '../config/clients';
 import { Transaction, TransactionSchema } from '../types';
-import { DatabaseError } from '../types/errors';
+import { DatabaseError, OwnershipError } from '../types/errors';
+import { DateService } from '../services/DateService';
+
+const dateService = new DateService();
 
 export class TransactionRepository {
   async create(transactionData: Partial<Transaction>): Promise<Transaction> {
@@ -17,20 +20,26 @@ export class TransactionRepository {
     return TransactionSchema.parse(data);
   }
 
-  async softDelete(transactionId: string): Promise<void> {
-    const { error } = await supabase
+  async softDelete(transactionId: string, userId: string): Promise<void> {
+    const { data, error } = await supabase
       .from('transactions')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', transactionId)
-      .is('deleted_at', null);
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .select('id');
 
     if (error) {
       throw new DatabaseError(error.message);
     }
+
+    if (!data || data.length === 0) {
+      throw new OwnershipError(`transaction ${transactionId}`);
+    }
   }
 
   async getDailyExpenseTotal(userId: string): Promise<number> {
-    const today = new Date().toISOString().split('T')[0]; 
+    const { start, end } = dateService.getDayBounds();
 
     const { data, error } = await supabase
       .from('transactions')
@@ -38,8 +47,8 @@ export class TransactionRepository {
       .eq('user_id', userId)
       .eq('type', 'EXPENSE')
       .is('deleted_at', null)
-      .gte('date', `${today}T00:00:00.000Z`)
-      .lte('date', `${today}T23:59:59.999Z`);
+      .gte('date', start.toISOString())
+      .lte('date', end.toISOString());
 
     if (error) {
       throw new DatabaseError(error.message);
@@ -53,8 +62,7 @@ export class TransactionRepository {
     year: number,
     month: number
   ): Promise<{ category: string; total: number }[]> {
-    const start = `${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`;
-    const end = new Date(year, month, 1).toISOString();
+    const { start, end } = dateService.getMonthBounds(year, month);
 
     const { data, error } = await supabase
       .from('transactions')
@@ -62,8 +70,8 @@ export class TransactionRepository {
       .eq('user_id', userId)
       .eq('type', 'EXPENSE')
       .is('deleted_at', null)
-      .gte('date', start)
-      .lt('date', end);
+      .gte('date', start.toISOString())
+      .lte('date', end.toISOString());
 
     if (error) {
       throw new DatabaseError(error.message);

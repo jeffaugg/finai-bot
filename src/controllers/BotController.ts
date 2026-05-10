@@ -2,6 +2,7 @@ import { Markup } from 'telegraf';
 import { bot } from '../config/clients';
 import { ExtractionService } from '../services/ExtractionService';
 import { GamificationService } from '../services/GamificationService';
+import { ModerationService } from '../services/ModerationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { message } from 'telegraf/filters';
@@ -11,6 +12,7 @@ const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 const extractionService = new ExtractionService();
 const gamificationService = new GamificationService(userRepo, transactionRepo);
+const moderationService = new ModerationService();
 
 export const setupBotCommands = () => {
   bot.start(async (ctx) => {
@@ -97,12 +99,22 @@ export const setupBotCommands = () => {
     const transactionId = ctx.match[1];
 
     try {
-      await transactionRepo.softDelete(transactionId);
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (!user) {
+        await ctx.answerCbQuery('⚠️ Cadastro não encontrado.');
+        return;
+      }
+
+      await transactionRepo.softDelete(transactionId, user.id);
       await ctx.editMessageText('✅ Gasto desfeito com sucesso!');
       await ctx.answerCbQuery();
     } catch (error) {
       console.error('Erro ao desfazer gasto:', error);
-      await ctx.answerCbQuery('⚠️ Não consegui desfazer. Tente novamente.');
+      if (error instanceof AppError) {
+        await ctx.answerCbQuery(error.userMessage);
+      } else {
+        await ctx.answerCbQuery('⚠️ Não consegui desfazer. Tente novamente.');
+      }
     }
   });
 
@@ -138,6 +150,12 @@ export const setupBotCommands = () => {
     const telegramId = ctx.from.id;
 
     if (userText.startsWith('/')) return;
+
+    const moderation = moderationService.preCheck(userText);
+    if (!moderation.allowed) {
+      await ctx.reply(moderation.cannedResponse!);
+      return;
+    }
 
     try {
       await ctx.sendChatAction('typing');

@@ -28,3 +28,13 @@ export class DatabaseError extends AppError {
     );
   }
 }
+
+export class OwnershipError extends AppError {
+  constructor(resource: string) {
+    super(
+      `Ownership check failed for ${resource}`,
+      'OWNERSHIP_ERROR',
+      '⚠️ Não encontrei esse registro entre os seus.'
+    );
+  }
+}

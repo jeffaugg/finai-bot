@@ -2,6 +2,9 @@ import { TransactionRepository } from '../repositories/TransactionRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { FinancialEventResult, GeminiExtraction, User } from '../types';
 import { RAW_TEXT_AI_PROCESSED } from '../types/constants';
+import { DateService } from './DateService';
+
+const dateService = new DateService();
 
 export class GamificationService {
   constructor(
@@ -112,7 +115,7 @@ export class GamificationService {
     const reservaAtual = Number(user.success_reserve);
     const streakAtual = Number(user.current_streak);
     const maxStreak = Number(user.max_streak);
-    const today = new Date().toISOString().split('T')[0];
+    const today = dateService.getCurrentLocalDateString();
 
     let novaReserva = reservaAtual;
     let novoStreak = streakAtual;
