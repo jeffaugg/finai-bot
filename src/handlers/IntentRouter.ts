@@ -24,9 +24,13 @@ export class IntentRouter {
         return this.expenseHandler.handle(ctx, user, text);
 
       case 'QUERY_SUMMARY':
+        return this.queryHandler.summary(ctx, user, classification);
+
       case 'QUERY_LIST':
+        return this.queryHandler.list(ctx, user, classification);
+
       case 'DELETE_BY_DESCRIPTION':
-        return this.queryHandler.handle(ctx, user, classification);
+        return this.queryHandler.deleteByDescription(ctx, user, classification);
 
       case 'HELP':
         return this.smallTalkHandler.help(ctx);

@@ -63,7 +63,14 @@ export class TransactionRepository {
     month: number
   ): Promise<{ category: string; total: number }[]> {
     const { start, end } = dateService.getMonthBounds(year, month);
+    return this.getCategorySummary(userId, start, end);
+  }
 
+  async getCategorySummary(
+    userId: string,
+    start: Date,
+    end: Date
+  ): Promise<{ category: string; total: number }[]> {
     const { data, error } = await supabase
       .from('transactions')
       .select('category, amount')
@@ -86,4 +93,61 @@ export class TransactionRepository {
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
   }
+
+  async listByPeriod(
+    userId: string,
+    opts: { start: Date; end: Date; category?: string; limit?: number }
+  ): Promise<Transaction[]> {
+    let query = supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', 'EXPENSE')
+      .is('deleted_at', null)
+      .gte('date', opts.start.toISOString())
+      .lte('date', opts.end.toISOString())
+      .order('date', { ascending: false });
+
+    if (opts.category) {
+      query = query.ilike('category', `%${escapeIlike(opts.category)}%`);
+    }
+
+    if (opts.limit) {
+      query = query.limit(opts.limit);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    return (data ?? []).map((t) => TransactionSchema.parse(t));
+  }
+
+  async findRecentByDescription(
+    userId: string,
+    description: string,
+    limit = 5
+  ): Promise<Transaction[]> {
+    const term = `%${escapeIlike(description)}%`;
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', 'EXPENSE')
+      .is('deleted_at', null)
+      .or(`category.ilike.${term},raw_text.ilike.${term}`)
+      .order('date', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    return (data ?? []).map((t) => TransactionSchema.parse(t));
+  }
+}
+
+function escapeIlike(s: string): string {
+  return s.replace(/[\\%_]/g, '\\$&');
 }

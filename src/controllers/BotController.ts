@@ -21,7 +21,7 @@ const moderationService = new ModerationService();
 const classificationService = new ClassificationService();
 const onboardingHandler = new OnboardingHandler(userRepo);
 const expenseHandler = new ExpenseHandler(extractionService, gamificationService);
-const queryHandler = new QueryHandler();
+const queryHandler = new QueryHandler(transactionRepo);
 const smallTalkHandler = new SmallTalkHandler();
 const intentRouter = new IntentRouter(expenseHandler, queryHandler, smallTalkHandler);
 
@@ -132,6 +132,39 @@ export const setupBotCommands = () => {
       } else {
         await ctx.answerCbQuery('⚠️ Não consegui desfazer. Tente novamente.');
       }
+    }
+  });
+
+  bot.action(/^confirm_delete:(.+)$/, async (ctx) => {
+    const transactionId = ctx.match[1];
+
+    try {
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (!user) {
+        await ctx.answerCbQuery('⚠️ Cadastro não encontrado.');
+        return;
+      }
+
+      await transactionRepo.softDelete(transactionId, user.id);
+      await ctx.editMessageText('✅ Gasto removido com sucesso!');
+      await ctx.answerCbQuery();
+    } catch (error) {
+      console.error('Erro ao remover gasto:', error);
+      if (error instanceof AppError) {
+        await ctx.answerCbQuery(error.userMessage);
+      } else {
+        await ctx.answerCbQuery('⚠️ Não consegui remover. Tente novamente.');
+      }
+    }
+  });
+
+  bot.action('cancel_delete', async (ctx) => {
+    try {
+      await ctx.editMessageText('❌ Operação cancelada.');
+      await ctx.answerCbQuery();
+    } catch (error) {
+      console.error('Erro no cancel_delete:', error);
+      await ctx.answerCbQuery();
     }
   });
 

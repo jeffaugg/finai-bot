@@ -78,4 +78,21 @@ export class DateService {
     const p = getZonedParts(ref, timezone);
     return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
   }
+
+  getWeekBounds(
+    timezone: string = this.defaultTimezone,
+    ref: Date = new Date()
+  ): { start: Date; end: Date } {
+    const today = this.getDayBounds(timezone, ref);
+    const start = new Date(today.start.getTime() - 6 * 24 * 60 * 60 * 1000);
+    return { start, end: today.end };
+  }
+
+  formatDate(date: Date, timezone: string = this.defaultTimezone): string {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: timezone,
+      day: '2-digit',
+      month: '2-digit',
+    }).format(date);
+  }
 }
