@@ -62,21 +62,21 @@
 ```
 finai-bot/
 ├── api/
-│   ├── webhook.ts          # Entry point do webhook Telegram
-│   └── cron/               # Jobs agendados (reminder, daily-close, monthly-report, onboarding-nudge)
-├── docs/assets/            # Diagramas e assets de documentação
+│   ├── webhook.ts          
+│   └── cron/               
+├── docs/assets/            
 ├── scripts/
-│   └── migrate.ts          # Runner de migrations SQL (idempotente)
+│   └── migrate.ts          
 ├── src/
-│   ├── config/             # Clients: Supabase, Telegraf, Gemini
-│   ├── controllers/        # BotController — pipeline de roteamento
-│   ├── handlers/           # Um handler por fluxo: Onboarding, Intent, Expense, Query, SmallTalk
-│   ├── repositories/       # UserRepository, TransactionRepository
-│   ├── services/           # Classification, Date, Extraction, Gamification, Moderation
-│   ├── types/              # Zod schemas, enums, erros customizados
-│   └── utils/              # parseAmount, parsePercentage
-├── supabase/migrations/    # SQL versionado (0001_init → 0003_onboarding_nudge)
-└── tests/unit/             # Testes Vitest (8 arquivos, 58 casos)
+│   ├── config/
+│   ├── controllers/
+│   ├── handlers/
+│   ├── repositories/       
+│   ├── services/
+│   ├── types/
+│   └── utils/              
+├── supabase/migrations/
+└── tests/unit/
 ```
 
 ---
