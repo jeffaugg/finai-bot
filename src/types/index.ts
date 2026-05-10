@@ -92,3 +92,36 @@ export interface FinancialEventResult {
   message: string;
   transactionId?: string;
 }
+
+export const ClassifiedIntent = z.enum([
+  'EXPENSE',
+  'INFLOW',
+  'UPDATE_SALARY',
+  'QUERY_SUMMARY',
+  'QUERY_LIST',
+  'DELETE_BY_DESCRIPTION',
+  'HELP',
+  'GREETING',
+  'OUT_OF_SCOPE',
+]);
+
+export type ClassifiedIntent = z.infer<typeof ClassifiedIntent>;
+
+export const ClassificationPeriod = z.enum(['today', 'week', 'month', 'last_month']);
+export type ClassificationPeriod = z.infer<typeof ClassificationPeriod>;
+
+export const ClassificationSlots = z
+  .object({
+    period: ClassificationPeriod.optional(),
+    category: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .optional();
+
+export const ClassificationSchema = z.object({
+  intent: ClassifiedIntent,
+  confidence: z.number().min(0).max(1),
+  slots: ClassificationSlots,
+});
+
+export type Classification = z.infer<typeof ClassificationSchema>;

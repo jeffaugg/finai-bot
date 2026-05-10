@@ -22,3 +22,16 @@ export const TOO_SHORT_RESPONSE =
 
 export const OFF_TOPIC_RESPONSE =
   '🤖 Sou um assistente focado em finanças. Posso te ajudar com seus gastos, ganhos ou um resumo do mês.';
+
+export const HELP_RESPONSE =
+  '🤖 *Como eu funciono:*\n\n' +
+  '• Me conte um gasto: "gastei 40 no mercado"\n' +
+  '• Me conte um ganho extra: "recebi 200 de bônus"\n' +
+  '• Atualize seu salário: "meu salário agora é 4000"\n' +
+  '• Peça um resumo: "quanto gastei hoje?"\n\n' +
+  'Comandos disponíveis:\n' +
+  '/status — seu progresso atual\n' +
+  '/historico — últimos 3 meses';
+
+export const QUERY_NOT_IMPLEMENTED_RESPONSE =
+  '🛠️ Estou aprendendo a responder esse tipo de pergunta. Por enquanto, use /status ou /historico.';

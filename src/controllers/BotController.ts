@@ -1,20 +1,29 @@
-import { Markup } from 'telegraf';
 import { bot } from '../config/clients';
 import { ExtractionService } from '../services/ExtractionService';
 import { GamificationService } from '../services/GamificationService';
 import { ModerationService } from '../services/ModerationService';
+import { ClassificationService } from '../services/ClassificationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { OnboardingHandler } from '../handlers/OnboardingHandler';
+import { ExpenseHandler } from '../handlers/ExpenseHandler';
+import { QueryHandler } from '../handlers/QueryHandler';
+import { SmallTalkHandler } from '../handlers/SmallTalkHandler';
+import { IntentRouter } from '../handlers/IntentRouter';
 import { message } from 'telegraf/filters';
-import { AIExtractionError, AppError } from '../types/errors';
+import { AppError } from '../types/errors';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 const extractionService = new ExtractionService();
 const gamificationService = new GamificationService(userRepo, transactionRepo);
 const moderationService = new ModerationService();
+const classificationService = new ClassificationService();
 const onboardingHandler = new OnboardingHandler(userRepo);
+const expenseHandler = new ExpenseHandler(extractionService, gamificationService);
+const queryHandler = new QueryHandler();
+const smallTalkHandler = new SmallTalkHandler();
+const intentRouter = new IntentRouter(expenseHandler, queryHandler, smallTalkHandler);
 
 export const setupBotCommands = () => {
   bot.start(async (ctx) => {
@@ -198,30 +207,15 @@ export const setupBotCommands = () => {
     }
 
     try {
-      await ctx.sendChatAction('typing');
-
-      const extractedData = await extractionService.extractFromText(userText);
-      const result = await gamificationService.processFinancialEvent(telegramId, extractedData);
-
-      if (result.transactionId) {
-        await ctx.reply(
-          result.message,
-          Markup.inlineKeyboard([Markup.button.callback('❌ Desfazer', `undo:${result.transactionId}`)])
-        );
-      } else {
-        await ctx.reply(result.message);
-      }
+      const classification = await classificationService.classify(userText);
+      await intentRouter.dispatch(ctx, user, userText, classification);
     } catch (error) {
       console.error('Erro ao processar mensagem:', error);
-
       if (error instanceof AppError) {
-        await ctx.reply(error.userMessage);
-      } else if (error instanceof AIExtractionError) {
         await ctx.reply(error.userMessage);
       } else {
         await ctx.reply(
-          '🤖 Ops! Minha inteligência artificial se confundiu com essa mensagem.\n' +
-            'Você poderia reescrever de forma mais direta? Ex: "gastei 40 no mercado".'
+          '🤖 Ops! Tive um problema ao processar sua mensagem. Pode tentar novamente?'
         );
       }
     }
