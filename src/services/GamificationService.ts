@@ -49,7 +49,7 @@ export class GamificationService {
       category: data.category,
       type: 'INFLOW',
       raw_text: rawText,
-      date: new Date(data.date_iso),
+      date: new Date(),
       deleted_at: null,
     });
 
@@ -97,7 +97,7 @@ export class GamificationService {
       category: data.category,
       type: 'EXPENSE',
       raw_text: rawText,
-      date: new Date(data.date_iso),
+      date: new Date(),
       deleted_at: null,
     });
 

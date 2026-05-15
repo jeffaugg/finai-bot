@@ -81,11 +81,9 @@ export const GeminiExtractionSchema = z.object({
     "O valor numérico absoluto extraído do texto. Nunca use negativo."
   ),
   category: z.string().describe(
-    "A categoria da transação (ex: Alimentação, Transporte, Lazer, Bônus). Retorne 'Salário' se a intenção for UPDATE_SALARY."
+    "Categoria GENÉRICA da transação. Escolha uma da lista canônica fornecida no prompt do sistema. " +
+    "Mapeie semanticamente (ex: ração→Pet, jiu-jitsu→Exercícios). Use 'Salário' para UPDATE_SALARY."
   ),
-  date_iso: z.string().describe(
-    "Data inferida no formato ISO 8601 (ex: '2026-05-03T12:00:00Z'). Use a data atual caso não seja especificado 'ontem' ou outra data."
-  )
 });
 
 export type GeminiExtraction = z.infer<typeof GeminiExtractionSchema>;

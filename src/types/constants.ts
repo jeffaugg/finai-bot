@@ -34,3 +34,20 @@ export const HELP_RESPONSE =
 
 export const QUERY_NOT_IMPLEMENTED_RESPONSE =
   '🛠️ Estou aprendendo a responder esse tipo de pergunta. Por enquanto, use /status ou /historico.';
+
+export const CANONICAL_CATEGORIES = [
+  'Alimentação',
+  'Transporte',
+  'Moradia',
+  'Saúde',
+  'Educação',
+  'Lazer',
+  'Exercícios',
+  'Pet',
+  'Vestuário',
+  'Beleza',
+  'Presentes',
+  'Bônus',
+  'Salário',
+  'Outros',
+] as const;

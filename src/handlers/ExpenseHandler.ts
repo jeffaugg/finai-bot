@@ -1,20 +1,23 @@
 import { Context, Markup } from 'telegraf';
 import { ExtractionService } from '../services/ExtractionService';
 import { GamificationService } from '../services/GamificationService';
+import { TransactionRepository } from '../repositories/TransactionRepository';
 import { User } from '../types';
 import { AIExtractionError, AppError } from '../types/errors';
 
 export class ExpenseHandler {
   constructor(
     private readonly extractionService: ExtractionService,
-    private readonly gamificationService: GamificationService
+    private readonly gamificationService: GamificationService,
+    private readonly transactionRepo: TransactionRepository
   ) {}
 
   async handle(ctx: Context, user: User, text: string): Promise<void> {
     try {
       await ctx.sendChatAction('typing');
 
-      const extracted = await this.extractionService.extractFromText(text);
+      const existingCategories = await this.transactionRepo.getDistinctCategories(user.id);
+      const extracted = await this.extractionService.extractFromText(text, existingCategories);
       const result = await this.gamificationService.processFinancialEvent(
         user.telegram_id,
         extracted,
