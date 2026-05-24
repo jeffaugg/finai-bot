@@ -147,10 +147,50 @@ export class GamificationService {
     } else {
       message +=
         `⚠️ Você estourou seu limite diário em R$ ${Math.abs(limiteRestante).toFixed(2)}.\n` +
-        `Sua Reserva de Sucesso será acionada hoje à noite para tentar salvar sua ofensiva!`;
+        `Sua Reserva de Sucesso será acionada hoje à noite para tentar salvar sua ofensiva!\n\n` +
+        `Quer ver onde foi hoje? É só pedir "resumo de hoje".`;
     }
 
     return { message, transactionId: transaction.id };
+  }
+
+  async correctLastExpense(
+    user: User,
+    newAmount: number,
+    newCategory?: string
+  ): Promise<FinancialEventResult> {
+    const last = await this.transactionRepo.findLastExpense(user.id);
+    if (!last) {
+      return { message: '🤔 Não encontrei um gasto recente para corrigir.' };
+    }
+
+    await this.transactionRepo.softDelete(last.id, user.id);
+
+    const category = newCategory ?? last.category;
+    const transaction = await this.transactionRepo.create({
+      user_id: user.id,
+      amount: newAmount,
+      category,
+      type: 'EXPENSE',
+      raw_text: `[correção] ${last.raw_text}`,
+      date: last.date,
+      deleted_at: null,
+    });
+
+    await this.eventRepo?.record(user.id, 'transaction_corrected', {
+      old_transaction_id: last.id,
+      new_transaction_id: transaction.id,
+      old_amount: Number(last.amount),
+      new_amount: newAmount,
+      category,
+    });
+
+    return {
+      message:
+        `✏️ Gasto corrigido!\n` +
+        `De R$ ${Number(last.amount).toFixed(2)} para R$ ${newAmount.toFixed(2)} em ${category}.`,
+      transactionId: transaction.id,
+    };
   }
 
   async closePendingDays(user: User): Promise<string | null> {

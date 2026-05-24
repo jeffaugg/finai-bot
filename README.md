@@ -24,7 +24,8 @@
 | Funcionalidade | Descrição |
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
-| **Pipeline dupla de IA** | ClassificationService classifica a intenção; ExtractionService extrai dados financeiros |
+| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover) em uma única chamada ao Gemini |
+| **Conversa multi-turn** | O agente usa o histórico recente para pedir o que faltar ("gastei no mercado" → "quanto?") e dar coaching reativo após um estouro |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
 | **Resumo de gastos** | "Quanto gastei hoje/essa semana/esse mês?" com totais por categoria |
 | **Listagem de transações** | "Me mostra meus gastos com lazer" com filtro e paginação |
@@ -35,6 +36,8 @@
 | **Moderação de mensagens** | Saudações e off-topics são respondidos sem acionar a IA |
 | **Timezone-aware** | Todas as queries usam horário de Brasília (`America/Sao_Paulo`) |
 | **Segurança de propriedade** | `softDelete` valida `user_id` — impossível apagar transação alheia |
+
+> **Nota metodológica (TCC):** a conversa multi-turn é uma **variável** do experimento. A retenção observada pode resultar da gamificação, da conversação ou da combinação das duas — a discussão de ameaças à validade deve reconhecer essa atribuição.
 
 ---
 
@@ -168,10 +171,11 @@ Os testes unitários ficam em `tests/unit/` e cobrem:
 
 - **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês
 - **`ModerationService`** — heurísticas de saudação, comprimento, off-topic
-- **`ClassificationService`** — parsing de JSON do Gemini, fallback para OUT_OF_SCOPE
+- **`AgentService`** — function calling do Gemini: mapeia cada tool, valida args com Zod, fallback para `none`
+- **`AgentRouter`** — despacho correto de cada tool para o handler
+- **`GamificationService`** — fechamento diário (3 desfechos, idempotência, dias pulados) e status
 - **`OnboardingHandler`** — todas as 5 transições de estado
 - **`QueryHandler`** — resumo, listagem, exclusão por descrição
-- **`IntentRouter`** — despacho correto por intent
 - **`parse`** — parseAmount e parsePercentage com variantes BR
 
 ### Integração Contínua
@@ -182,12 +186,14 @@ Cada pull request aciona automaticamente o workflow `.github/workflows/ci.yml`, 
 
 ## Cron
 
-| Endpoint | Cron | Descrição |
-|---|---|---|
-| `/api/cron/reminder` | `0 23 * * *` | Lembrete para usuários sem gasto no dia |
-| `/api/cron/daily-close` | `59 23 * * *` | Fechamento do dia (streaks e reserva) |
-| `/api/cron/monthly-report` | `0 8 1 * *` | Relatório do mês anterior |
-| `/api/cron/onboarding-nudge` | `0 21 * * *` | Reengajamento de onboardings incompletos |
+Os agendamentos da Vercel rodam em **UTC**; abaixo, a coluna "Horário (SP)" mostra o horário local pretendido (`America/Sao_Paulo`, UTC−3).
+
+| Endpoint | Cron (UTC) | Horário (SP) | Descrição |
+|---|---|---|---|
+| `/api/cron/reminder` | `0 2 * * *` | 23:00 | Lembrete para usuários sem gasto no dia |
+| `/api/cron/daily-close` | `59 2 * * *` | 23:59 | Fechamento do dia (streaks e reserva) |
+| `/api/cron/monthly-report` | `0 11 1 * *` | 08:00 (dia 1) | Relatório do mês anterior |
+| `/api/cron/onboarding-nudge` | `0 0 * * *` | 21:00 | Reengajamento de onboardings incompletos |
 
 ---
 

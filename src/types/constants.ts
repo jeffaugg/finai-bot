@@ -4,6 +4,7 @@ export const MAX_INPUT_LENGTH = 500;
 export const TIMEZONE = 'America/Sao_Paulo';
 
 export const MIN_INPUT_LENGTH = 2;
+export const HIGH_VALUE_THRESHOLD = 500;
 
 export const GREETING_PATTERNS: RegExp[] = [
   /^\s*(oi+|ol[áa]+|hello|hey|hi)\s*[!.?]*\s*$/i,
@@ -30,7 +31,8 @@ export const HELP_RESPONSE =
   '• Peça um resumo: "quanto gastei hoje?"\n\n' +
   'Comandos disponíveis:\n' +
   '/status — seu progresso atual\n' +
-  '/historico — últimos 3 meses';
+  '/historico — últimos 3 meses\n' +
+  '/feedback — envie uma sugestão';
 
 export const QUERY_NOT_IMPLEMENTED_RESPONSE =
   '🛠️ Estou aprendendo a responder esse tipo de pergunta. Por enquanto, use /status ou /historico.';

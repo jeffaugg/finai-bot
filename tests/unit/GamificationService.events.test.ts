@@ -32,6 +32,8 @@ const userRepo = {
 const txRepo = {
   create: vi.fn(),
   getDailyExpenseTotal: vi.fn(),
+  findLastExpense: vi.fn(),
+  softDelete: vi.fn(),
 };
 
 const eventRepo = {
@@ -45,12 +47,15 @@ beforeEach(() => {
   userRepo.updateUser.mockReset();
   txRepo.create.mockReset();
   txRepo.getDailyExpenseTotal.mockReset();
+  txRepo.findLastExpense.mockReset();
+  txRepo.softDelete.mockReset();
   eventRepo.record.mockReset();
 
   userRepo.findByTelegramId.mockResolvedValue(makeUser());
   userRepo.updateUser.mockResolvedValue(makeUser());
   txRepo.create.mockResolvedValue({ id: 'tx-1' });
   txRepo.getDailyExpenseTotal.mockResolvedValue(40);
+  txRepo.softDelete.mockResolvedValue(undefined);
 });
 
 describe('GamificationService emite eventos', () => {
@@ -98,5 +103,54 @@ describe('GamificationService emite eventos', () => {
 
     expect(eventRepo.record).not.toHaveBeenCalled();
     expect(result.message).toContain('Não encontrei seu cadastro');
+  });
+});
+
+describe('GamificationService.correctLastExpense', () => {
+  it('desfaz o último gasto e recria com o novo valor, emitindo transaction_corrected', async () => {
+    txRepo.findLastExpense.mockResolvedValue({
+      id: 'old',
+      amount: 100,
+      category: 'Alimentação',
+      raw_text: 'gastei 100',
+      date: new Date('2026-05-20T12:00:00Z'),
+    });
+
+    const result = await svc.correctLastExpense(makeUser(), 80);
+
+    expect(txRepo.softDelete).toHaveBeenCalledWith('old', 'u1');
+    expect(txRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 80, category: 'Alimentação', type: 'EXPENSE' })
+    );
+    expect(eventRepo.record).toHaveBeenCalledWith(
+      'u1',
+      'transaction_corrected',
+      expect.objectContaining({ old_amount: 100, new_amount: 80 })
+    );
+    expect(result.transactionId).toBe('tx-1');
+  });
+
+  it('usa a nova categoria quando informada', async () => {
+    txRepo.findLastExpense.mockResolvedValue({
+      id: 'old',
+      amount: 100,
+      category: 'Alimentação',
+      raw_text: 'x',
+      date: new Date('2026-05-20T12:00:00Z'),
+    });
+
+    await svc.correctLastExpense(makeUser(), 80, 'Lazer');
+
+    expect(txRepo.create).toHaveBeenCalledWith(expect.objectContaining({ category: 'Lazer' }));
+  });
+
+  it('avisa quando não há gasto recente para corrigir', async () => {
+    txRepo.findLastExpense.mockResolvedValue(null);
+
+    const result = await svc.correctLastExpense(makeUser(), 80);
+
+    expect(result.message).toContain('Não encontrei');
+    expect(txRepo.softDelete).not.toHaveBeenCalled();
+    expect(txRepo.create).not.toHaveBeenCalled();
   });
 });

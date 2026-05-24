@@ -1,14 +1,17 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { bot, supabase } from '../../src/config/clients';
-import { UserRepository } from '../../src/repositories/UserRepository';
 import { TransactionRepository } from '../../src/repositories/TransactionRepository';
+import { isCronAuthorized } from '../../src/utils/auth';
 
-const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).send('Method Not Allowed');
+  }
+
+  if (!isCronAuthorized(req.headers.authorization, process.env.CRON_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

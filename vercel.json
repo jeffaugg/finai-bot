@@ -19,19 +19,19 @@
   "crons": [
     {
       "path": "/api/cron/reminder",
-      "schedule": "0 23 * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/daily-close",
-      "schedule": "59 23 * * *"
+      "schedule": "59 2 * * *"
     },
     {
       "path": "/api/cron/monthly-report",
-      "schedule": "0 8 1 * *"
+      "schedule": "0 11 1 * *"
     },
     {
       "path": "/api/cron/onboarding-nudge",
-      "schedule": "0 21 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
