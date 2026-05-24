@@ -2,11 +2,20 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { bot } from '../../src/config/clients';
 import { UserRepository } from '../../src/repositories/UserRepository';
 import { TransactionRepository } from '../../src/repositories/TransactionRepository';
+import { EventRepository } from '../../src/repositories/EventRepository';
+import { SnapshotRepository } from '../../src/repositories/SnapshotRepository';
 import { GamificationService } from '../../src/services/GamificationService';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
-const gamificationService = new GamificationService(userRepo, transactionRepo);
+const eventRepo = new EventRepository();
+const snapshotRepo = new SnapshotRepository();
+const gamificationService = new GamificationService(
+  userRepo,
+  transactionRepo,
+  eventRepo,
+  snapshotRepo
+);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
@@ -19,8 +28,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const user of users) {
       try {
-        const message = await gamificationService.closeDailyAccount(user);
-        await bot.telegram.sendMessage(user.telegram_id, message, { parse_mode: 'Markdown' });
+        const message = await gamificationService.closePendingDays(user);
+        if (message) {
+          await bot.telegram.sendMessage(user.telegram_id, message, { parse_mode: 'Markdown' });
+        }
         results.success++;
       } catch (err) {
         console.error(`Erro ao fechar dia do usuário ${user.telegram_id}:`, err);

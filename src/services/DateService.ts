@@ -59,6 +59,43 @@ export class DateService {
     return { start, end };
   }
 
+  getDayBoundsForLocalDate(
+    dateStr: string,
+    timezone: string = this.defaultTimezone
+  ): { start: Date; end: Date } {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const start = zonedTimeToUtc({ year, month, day, hour: 0, minute: 0, second: 0 }, timezone);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    return { start, end };
+  }
+
+  toDateString(date: Date): string {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  addDays(dateStr: string, days: number): string {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dt.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  dateRange(startStr: string, endStr: string, maxDays = 366): string[] {
+    const out: string[] = [];
+    let cur = startStr;
+    while (cur <= endStr && out.length < maxDays) {
+      out.push(cur);
+      cur = this.addDays(cur, 1);
+    }
+    return out;
+  }
+
   getMonthBounds(
     year: number,
     month: number,

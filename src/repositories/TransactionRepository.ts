@@ -38,8 +38,10 @@ export class TransactionRepository {
     }
   }
 
-  async getDailyExpenseTotal(userId: string): Promise<number> {
-    const { start, end } = dateService.getDayBounds();
+  async getDailyExpenseTotal(userId: string, dateStr?: string): Promise<number> {
+    const { start, end } = dateStr
+      ? dateService.getDayBoundsForLocalDate(dateStr)
+      : dateService.getDayBounds();
 
     const { data, error } = await supabase
       .from('transactions')

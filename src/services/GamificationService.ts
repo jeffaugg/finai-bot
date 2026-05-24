@@ -1,17 +1,32 @@
 import { EventRepository } from '../repositories/EventRepository';
+import { SnapshotRepository } from '../repositories/SnapshotRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import { FinancialEventResult, GeminiExtraction, User } from '../types';
+import { CloseResult, FinancialEventResult, GeminiExtraction, User } from '../types';
 import { DateService } from './DateService';
 
 const dateService = new DateService();
+
+interface CloseState {
+  success_reserve: number;
+  current_streak: number;
+  max_streak: number;
+}
 
 export class GamificationService {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly transactionRepo: TransactionRepository,
-    private readonly eventRepo?: EventRepository
+    private readonly eventRepo?: EventRepository,
+    private readonly snapshotRepo?: SnapshotRepository
   ) {}
+
+  private get snapshots(): SnapshotRepository {
+    if (!this.snapshotRepo) {
+      throw new Error('SnapshotRepository é obrigatório para o fechamento diário');
+    }
+    return this.snapshotRepo;
+  }
 
   async processFinancialEvent(
     telegramId: number,
@@ -138,17 +153,52 @@ export class GamificationService {
     return { message, transactionId: transaction.id };
   }
 
-  async closeDailyAccount(user: User): Promise<string> {
-    const totalGasto = await this.transactionRepo.getDailyExpenseTotal(user.id);
+  async closePendingDays(user: User): Promise<string | null> {
+    const todayStr = dateService.getCurrentLocalDateString();
+    const startStr = user.last_closed_date
+      ? dateService.addDays(dateService.toDateString(user.last_closed_date), 1)
+      : todayStr;
+
+    if (startStr > todayStr) {
+      return null;
+    }
+
+    let state: CloseState = {
+      success_reserve: Number(user.success_reserve),
+      current_streak: Number(user.current_streak),
+      max_streak: Number(user.max_streak),
+    };
+    let lastMessage: string | null = null;
+
+    for (const dateStr of dateService.dateRange(startStr, todayStr)) {
+      const result = await this.closeDay({ ...user, ...state }, dateStr);
+      if (result) {
+        state = result.state;
+        lastMessage = result.message;
+      }
+    }
+
+    return lastMessage;
+  }
+
+  async closeDay(
+    user: User,
+    dateStr: string
+  ): Promise<{ message: string; state: CloseState } | null> {
+    if (await this.snapshots.existsForDate(user.id, dateStr)) {
+      return null;
+    }
+
+    const totalGasto = await this.transactionRepo.getDailyExpenseTotal(user.id, dateStr);
     const limite = Number(user.daily_limit);
     const reservaAtual = Number(user.success_reserve);
     const streakAtual = Number(user.current_streak);
     const maxStreak = Number(user.max_streak);
-    const today = dateService.getCurrentLocalDateString();
 
     let novaReserva = reservaAtual;
     let novoStreak = streakAtual;
     let novoMaxStreak = maxStreak;
+    let closeResult: CloseResult;
     let mensagem: string;
 
     if (totalGasto <= limite) {
@@ -156,6 +206,7 @@ export class GamificationService {
       novaReserva = reservaAtual + surplus;
       novoStreak = streakAtual + 1;
       novoMaxStreak = Math.max(maxStreak, novoStreak);
+      closeResult = 'success';
 
       mensagem =
         `✅ *Dia fechado com sucesso!*\n\n` +
@@ -169,6 +220,7 @@ export class GamificationService {
 
       if (reservaAtual >= excesso) {
         novaReserva = reservaAtual - excesso;
+        closeResult = 'reserve_used';
 
         mensagem =
           `⚠️ *Limite ultrapassado — Reserva acionada!*\n\n` +
@@ -179,6 +231,7 @@ export class GamificationService {
       } else {
         novaReserva = 0;
         novoStreak = 0;
+        closeResult = 'streak_reset';
 
         mensagem =
           `😔 *Dia difícil de fechar...*\n\n` +
@@ -188,14 +241,44 @@ export class GamificationService {
       }
     }
 
+    const snapshot = await this.snapshots.insert({
+      user_id: user.id,
+      snapshot_date: dateStr,
+      current_streak: novoStreak,
+      success_reserve: novaReserva,
+      daily_limit: limite,
+      total_spent: totalGasto,
+      had_activity: totalGasto > 0,
+      close_result: closeResult,
+    });
+
+    if (!snapshot) {
+      return null;
+    }
+
     await this.userRepo.updateUser(user.id, {
       success_reserve: novaReserva,
       current_streak: novoStreak,
       max_streak: novoMaxStreak,
-      last_closed_date: new Date(today) as unknown as Date,
+      last_closed_date: new Date(dateStr),
     });
 
-    return mensagem;
+    await this.eventRepo?.record(user.id, 'daily_closed', {
+      snapshot_date: dateStr,
+      total_spent: totalGasto,
+      close_result: closeResult,
+      current_streak: novoStreak,
+      success_reserve: novaReserva,
+    });
+
+    return {
+      message: mensagem,
+      state: {
+        success_reserve: novaReserva,
+        current_streak: novoStreak,
+        max_streak: novoMaxStreak,
+      },
+    };
   }
 
   async getStatus(telegramId: number): Promise<string> {
