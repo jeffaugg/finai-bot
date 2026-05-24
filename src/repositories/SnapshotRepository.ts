@@ -29,22 +29,6 @@ export class SnapshotRepository {
     return data !== null;
   }
 
-  async findLatest(userId: string): Promise<DailySnapshot | null> {
-    const { data, error } = await supabase
-      .from('daily_snapshots')
-      .select('*')
-      .eq('user_id', userId)
-      .order('snapshot_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      throw new DatabaseError(error.message);
-    }
-
-    return data ? DailySnapshotSchema.parse(data) : null;
-  }
-
   // Retorna null se o snapshot do dia já existe o que torna o fechamento idempotente e seguro contra corrida.
   async insert(input: DailySnapshotInput): Promise<DailySnapshot | null> {
     const { data, error } = await supabase

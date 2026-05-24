@@ -136,6 +136,60 @@ describe('GamificationService.closeDay', () => {
   });
 });
 
+describe('GamificationService.closeDay — bordas', () => {
+  it('gasto exatamente no limite conta como sucesso (sobra zero)', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(80);
+
+    const result = await svc.closeDay(makeUser(), '2026-05-20');
+
+    expect(result?.state).toEqual({ success_reserve: 0, current_streak: 1, max_streak: 1 });
+    expect(snapshotRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ close_result: 'success', total_spent: 80 })
+    );
+  });
+
+  it('reserva que cobre exatamente o excesso mantém o streak', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(100);
+
+    const result = await svc.closeDay(
+      makeUser({ success_reserve: 20, current_streak: 3, max_streak: 3 }),
+      '2026-05-20'
+    );
+
+    expect(result?.state).toEqual({ success_reserve: 0, current_streak: 3, max_streak: 3 });
+    expect(snapshotRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ close_result: 'reserve_used' })
+    );
+  });
+
+  it('atualiza max_streak ao bater novo recorde', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(10);
+
+    const result = await svc.closeDay(
+      makeUser({ current_streak: 5, max_streak: 5 }),
+      '2026-05-20'
+    );
+
+    expect(result?.state.current_streak).toBe(6);
+    expect(result?.state.max_streak).toBe(6);
+    expect(userRepo.updateUser).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ max_streak: 6 })
+    );
+  });
+
+  it('grava last_closed_date com a data do dia fechado', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(10);
+
+    await svc.closeDay(makeUser(), '2026-05-20');
+
+    expect(userRepo.updateUser).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ last_closed_date: new Date('2026-05-20') })
+    );
+  });
+});
+
 describe('GamificationService.closePendingDays', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -169,5 +223,28 @@ describe('GamificationService.closePendingDays', () => {
 
     expect(message).toBeNull();
     expect(snapshotRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('acumula a reserva ao longo dos dias recuperados', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(0);
+
+    await svc.closePendingDays(makeUser({ last_closed_date: new Date('2026-05-21') }));
+
+    const reservas = snapshotRepo.insert.mock.calls.map(
+      (c) => (c[0] as DailySnapshotInput).success_reserve
+    );
+    expect(reservas).toEqual([80, 160, 240]);
+  });
+
+  it('usuário novo (sem last_closed_date) fecha apenas hoje', async () => {
+    txRepo.getDailyExpenseTotal.mockResolvedValue(0);
+
+    const message = await svc.closePendingDays(makeUser({ last_closed_date: null }));
+
+    const dias = snapshotRepo.insert.mock.calls.map(
+      (c) => (c[0] as DailySnapshotInput).snapshot_date
+    );
+    expect(dias).toEqual(['2026-05-24']);
+    expect(message).toContain('Dia fechado com sucesso');
   });
 });
