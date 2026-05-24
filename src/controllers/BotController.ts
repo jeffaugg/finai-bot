@@ -1,10 +1,11 @@
 import { bot } from '../config/clients';
-import { AgentService } from '../services/AgentService';
+import { AgentService, AgentAction } from '../services/AgentService';
 import { GamificationService } from '../services/GamificationService';
 import { ModerationService } from '../services/ModerationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { EventRepository } from '../repositories/EventRepository';
+import { ConversationRepository } from '../repositories/ConversationRepository';
 import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { ExpenseHandler } from '../handlers/ExpenseHandler';
 import { QueryHandler } from '../handlers/QueryHandler';
@@ -16,6 +17,7 @@ import { AppError } from '../types/errors';
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 const eventRepo = new EventRepository();
+const conversationRepo = new ConversationRepository();
 const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
 const moderationService = new ModerationService();
 const agentService = new AgentService();
@@ -24,6 +26,25 @@ const expenseHandler = new ExpenseHandler(gamificationService);
 const queryHandler = new QueryHandler(transactionRepo, eventRepo);
 const smallTalkHandler = new SmallTalkHandler();
 const agentRouter = new AgentRouter(expenseHandler, queryHandler, smallTalkHandler);
+
+function modelTurnContent(action: AgentAction): string {
+  switch (action.tool) {
+    case 'registrar_gasto':
+      return `Registrei um gasto de R$ ${action.amount.toFixed(2)} em ${action.category}.`;
+    case 'registrar_entrada':
+      return `Registrei uma entrada de R$ ${action.amount.toFixed(2)}.`;
+    case 'atualizar_salario':
+      return `Atualizei o salário para R$ ${action.amount.toFixed(2)}.`;
+    case 'consultar_resumo':
+      return 'Mostrei o resumo de gastos.';
+    case 'listar_transacoes':
+      return 'Mostrei a lista de transações.';
+    case 'remover_transacao':
+      return 'Pedi confirmação para remover um gasto.';
+    case 'none':
+      return action.text ?? '';
+  }
+}
 
 export const setupBotCommands = () => {
   bot.start(async (ctx) => {
@@ -253,8 +274,15 @@ export const setupBotCommands = () => {
     }
 
     try {
-      const action = await agentService.interpret(userText);
+      const history = await conversationRepo.recentWindow(user.id);
+      const action = await agentService.interpret(userText, history);
       await agentRouter.dispatch(ctx, user, action, userText);
+
+      await conversationRepo.append(user.id, 'user', userText);
+      const modelTurn = modelTurnContent(action);
+      if (modelTurn) {
+        await conversationRepo.append(user.id, 'model', modelTurn);
+      }
     } catch (error) {
       console.error('Erro ao processar mensagem:', error);
       if (error instanceof AppError) {

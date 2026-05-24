@@ -25,6 +25,7 @@
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
 | **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover) em uma única chamada ao Gemini |
+| **Conversa multi-turn** | O agente usa o histórico recente para pedir o que faltar ("gastei no mercado" → "quanto?") e dar coaching reativo após um estouro |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
 | **Resumo de gastos** | "Quanto gastei hoje/essa semana/esse mês?" com totais por categoria |
 | **Listagem de transações** | "Me mostra meus gastos com lazer" com filtro e paginação |
@@ -35,6 +36,8 @@
 | **Moderação de mensagens** | Saudações e off-topics são respondidos sem acionar a IA |
 | **Timezone-aware** | Todas as queries usam horário de Brasília (`America/Sao_Paulo`) |
 | **Segurança de propriedade** | `softDelete` valida `user_id` — impossível apagar transação alheia |
+
+> **Nota metodológica (TCC):** a conversa multi-turn é uma **variável** do experimento. A retenção observada pode resultar da gamificação, da conversação ou da combinação das duas — a discussão de ameaças à validade deve reconhecer essa atribuição.
 
 ---
 

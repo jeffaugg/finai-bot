@@ -33,7 +33,8 @@ const router = new AgentRouter(
   smallTalkHandler as never
 );
 
-const ctx = {} as never;
+const reply = vi.fn();
+const ctx = { reply } as never;
 
 beforeEach(() => {
   expenseHandler.handle.mockReset();
@@ -41,6 +42,7 @@ beforeEach(() => {
   queryHandler.list.mockReset();
   queryHandler.deleteByDescription.mockReset();
   smallTalkHandler.help.mockReset();
+  reply.mockReset();
 });
 
 describe('AgentRouter.dispatch', () => {
@@ -132,9 +134,22 @@ describe('AgentRouter.dispatch', () => {
     );
   });
 
-  it('none → SmallTalkHandler.help', async () => {
+  it('none sem texto → SmallTalkHandler.help', async () => {
     await router.dispatch(ctx, makeUser(), { tool: 'none' }, 'oi tudo bem?');
 
     expect(smallTalkHandler.help).toHaveBeenCalledWith(ctx);
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it('none com texto → responde o texto do modelo (follow-up)', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'none', text: 'Quanto você gastou?' },
+      'gastei no mercado'
+    );
+
+    expect(reply).toHaveBeenCalledWith('Quanto você gastou?');
+    expect(smallTalkHandler.help).not.toHaveBeenCalled();
   });
 });

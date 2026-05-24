@@ -1,6 +1,7 @@
 import { Type, FunctionDeclaration, Schema } from '@google/genai';
 import { z } from 'zod';
 import { ai } from '../config/clients';
+import { ConversationTurn } from '../repositories/ConversationRepository';
 import { ClassificationPeriod } from '../types';
 import { CANONICAL_CATEGORIES, GEMINI_MODEL, MAX_INPUT_LENGTH } from '../types/constants';
 
@@ -11,7 +12,7 @@ export type AgentAction =
   | { tool: 'consultar_resumo'; period?: ClassificationPeriod }
   | { tool: 'listar_transacoes'; period?: ClassificationPeriod; category?: string }
   | { tool: 'remover_transacao'; description: string }
-  | { tool: 'none' };
+  | { tool: 'none'; text?: string };
 
 const argSchemas = {
   registrar_gasto: z.object({ amount: z.number().positive(), category: z.string().min(1) }),
@@ -149,17 +150,24 @@ const SYSTEM_INSTRUCTION =
   `- pedido para remover/desfazer um gasto → remover_transacao\n` +
   `Se a mensagem não for sobre finanças ou for só uma dúvida de uso, NÃO chame nenhuma ferramenta.\n` +
   `Ao registrar gasto/entrada, escolha uma categoria GENÉRICA da lista canônica: [${CANONICAL_CATEGORIES.join(', ')}]. ` +
-  `Mapeie semanticamente (ração→Pet, jiu-jitsu→Exercícios, mercado→Alimentação). Use 'Outros' só se nada se aplicar.`;
+  `Mapeie semanticamente (ração→Pet, jiu-jitsu→Exercícios, mercado→Alimentação). Use 'Outros' só se nada se aplicar.\n` +
+  `Se faltar uma informação obrigatória (ex.: o valor de um gasto em "gastei no mercado"), NÃO invente nem chame a ferramenta — ` +
+  `pergunte ao usuário em uma frase curta. Use o histórico da conversa para completar pedidos iniciados antes.`;
 
 export class AgentService {
-  async interpret(text: string): Promise<AgentAction> {
+  async interpret(text: string, history: ConversationTurn[] = []): Promise<AgentAction> {
     if (text.length > MAX_INPUT_LENGTH) {
       return { tool: 'none' };
     }
 
+    const contents = [
+      ...history.map((turn) => ({ role: turn.role, parts: [{ text: turn.content }] })),
+      { role: 'user', parts: [{ text }] },
+    ];
+
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: text,
+      contents,
       config: {
         tools: [{ functionDeclarations: TOOLS }],
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -168,7 +176,7 @@ export class AgentService {
 
     const call = response.functionCalls?.[0];
     if (!call?.name) {
-      return { tool: 'none' };
+      return { tool: 'none', text: response.text };
     }
 
     return parseCall(call.name, call.args ?? {});

@@ -147,7 +147,8 @@ export class GamificationService {
     } else {
       message +=
         `⚠️ Você estourou seu limite diário em R$ ${Math.abs(limiteRestante).toFixed(2)}.\n` +
-        `Sua Reserva de Sucesso será acionada hoje à noite para tentar salvar sua ofensiva!`;
+        `Sua Reserva de Sucesso será acionada hoje à noite para tentar salvar sua ofensiva!\n\n` +
+        `Quer ver onde foi hoje? É só pedir "resumo de hoje".`;
     }
 
     return { message, transactionId: transaction.id };

@@ -60,6 +60,10 @@ export class AgentRouter {
         );
 
       case 'none':
+        if (action.text) {
+          await ctx.reply(action.text);
+          return;
+        }
         return this.smallTalkHandler.help(ctx);
     }
   }

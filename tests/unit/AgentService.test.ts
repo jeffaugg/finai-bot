@@ -67,6 +67,27 @@ describe('AgentService.interpret', () => {
     expect(action).toEqual({ tool: 'none' });
   });
 
+  it('retorna none com o texto do modelo (pergunta de follow-up)', async () => {
+    generateContent.mockResolvedValue({ functionCalls: undefined, text: 'Quanto você gastou?' });
+    const action = await svc.interpret('gastei no mercado');
+    expect(action).toEqual({ tool: 'none', text: 'Quanto você gastou?' });
+  });
+
+  it('inclui o histórico no contents enviado ao modelo', async () => {
+    mockCall('registrar_gasto', { amount: 40, category: 'Alimentação' });
+    const history = [
+      { role: 'user' as const, content: 'gastei no mercado' },
+      { role: 'model' as const, content: 'Quanto você gastou?' },
+    ];
+
+    await svc.interpret('40', history);
+
+    const contents = generateContent.mock.calls[0][0].contents;
+    expect(contents).toHaveLength(3);
+    expect(contents[0]).toEqual({ role: 'user', parts: [{ text: 'gastei no mercado' }] });
+    expect(contents[2]).toEqual({ role: 'user', parts: [{ text: '40' }] });
+  });
+
   it('retorna none quando os args violam a invariante de negócio (Zod)', async () => {
     mockCall('registrar_gasto', { amount: -5, category: 'Alimentação' });
     const action = await svc.interpret('gastei -5');
