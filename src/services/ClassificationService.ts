@@ -1,9 +1,32 @@
+import { Type } from '@google/genai';
 import { ai } from '../config/clients';
-import { Classification, ClassificationSchema } from '../types';
+import {
+  Classification,
+  ClassificationSchema,
+  ClassifiedIntent,
+  ClassificationPeriod,
+} from '../types';
 import { AppError } from '../types/errors';
 import { GEMINI_MODEL, MAX_INPUT_LENGTH } from '../types/constants';
 
 const CONFIDENCE_THRESHOLD = 0.5;
+
+const CLASSIFICATION_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    intent: { type: Type.STRING, enum: [...ClassifiedIntent.options] },
+    confidence: { type: Type.NUMBER },
+    slots: {
+      type: Type.OBJECT,
+      properties: {
+        period: { type: Type.STRING, enum: [...ClassificationPeriod.options] },
+        category: { type: Type.STRING },
+        description: { type: Type.STRING },
+      },
+    },
+  },
+  required: ['intent', 'confidence'],
+};
 
 const SYSTEM_INSTRUCTION = `Você é um classificador de mensagens para um bot financeiro pessoal em português brasileiro.
 Retorne APENAS um JSON válido com {intent, confidence, slots?}.
@@ -49,6 +72,7 @@ export class ClassificationService {
       contents: sanitized,
       config: {
         responseMimeType: 'application/json',
+        responseSchema: CLASSIFICATION_SCHEMA,
         systemInstruction: SYSTEM_INSTRUCTION,
       },
     });

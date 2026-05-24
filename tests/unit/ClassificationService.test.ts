@@ -27,6 +27,16 @@ describe('ClassificationService.classify', () => {
     expect(result.confidence).toBeCloseTo(0.95);
   });
 
+  it('envia responseSchema estruturado na config', async () => {
+    mockResponse({ intent: 'EXPENSE', confidence: 0.9 });
+    await svc.classify('gastei 40 no mercado');
+
+    const config = generateContent.mock.calls[0][0].config;
+    expect(config.responseMimeType).toBe('application/json');
+    expect(config.responseSchema.required).toContain('intent');
+    expect(config.responseSchema.required).toContain('confidence');
+  });
+
   it('parses slots for QUERY_SUMMARY', async () => {
     mockResponse({ intent: 'QUERY_SUMMARY', confidence: 0.9, slots: { period: 'week' } });
     const result = await svc.classify('quanto gastei essa semana?');

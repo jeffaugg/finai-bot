@@ -1,7 +1,30 @@
+import { Type } from '@google/genai';
 import { ai } from '../config/clients';
-import { GeminiExtractionSchema, GeminiExtraction } from '../types';
+import { GeminiExtractionSchema, GeminiExtraction, IntentEnum } from '../types';
 import { AIExtractionError } from '../types/errors';
 import { CANONICAL_CATEGORIES, GEMINI_MODEL, MAX_INPUT_LENGTH } from '../types/constants';
+
+const EXTRACTION_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    intent: {
+      type: Type.STRING,
+      enum: [...IntentEnum.options],
+      description:
+        "Classifique a intenção: 'EXPENSE' para gastos, 'INFLOW' para ganhos extras/bônus, 'UPDATE_SALARY' para mudança de renda fixa.",
+    },
+    amount: {
+      type: Type.NUMBER,
+      description: 'O valor numérico absoluto extraído do texto. Nunca use negativo.',
+    },
+    category: {
+      type: Type.STRING,
+      description:
+        'Categoria GENÉRICA da transação, escolhida da lista canônica fornecida na instrução do sistema.',
+    },
+  },
+  required: ['intent', 'amount', 'category'],
+};
 
 export class ExtractionService {
   async extractFromText(text: string, existingCategories?: string[]): Promise<GeminiExtraction> {
@@ -34,10 +57,8 @@ export class ExtractionService {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        systemInstruction:
-          `Você é um extrator de dados JSON. Retorne ESTRITAMENTE um JSON válido seguindo este esquema: ` +
-          `${JSON.stringify(GeminiExtractionSchema.shape)}` +
-          categoryGuidance,
+        responseSchema: EXTRACTION_SCHEMA,
+        systemInstruction: `Você é um extrator de dados financeiros.${categoryGuidance}`,
       },
     });
 
