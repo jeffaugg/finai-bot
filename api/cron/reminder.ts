@@ -3,6 +3,7 @@ import { Markup } from 'telegraf';
 import { bot } from '../../src/config/clients';
 import { UserRepository } from '../../src/repositories/UserRepository';
 import { EventRepository } from '../../src/repositories/EventRepository';
+import { isCronAuthorized } from '../../src/utils/auth';
 
 const userRepo = new UserRepository();
 const eventRepo = new EventRepository();
@@ -14,6 +15,10 @@ const REMINDER_MESSAGE =
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).send('Method Not Allowed');
+  }
+
+  if (!isCronAuthorized(req.headers.authorization, process.env.CRON_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

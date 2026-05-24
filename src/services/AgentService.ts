@@ -4,6 +4,7 @@ import { ai } from '../config/clients';
 import { ConversationTurn } from '../repositories/ConversationRepository';
 import { ClassificationPeriod } from '../types';
 import { CANONICAL_CATEGORIES, GEMINI_MODEL, MAX_INPUT_LENGTH } from '../types/constants';
+import { withRetry } from '../utils/retry';
 
 export type AgentAction =
   | { tool: 'registrar_gasto'; amount: number; category: string }
@@ -165,14 +166,16 @@ export class AgentService {
       { role: 'user', parts: [{ text }] },
     ];
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents,
-      config: {
-        tools: [{ functionDeclarations: TOOLS }],
-        systemInstruction: SYSTEM_INSTRUCTION,
-      },
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents,
+        config: {
+          tools: [{ functionDeclarations: TOOLS }],
+          systemInstruction: SYSTEM_INSTRUCTION,
+        },
+      })
+    );
 
     const call = response.functionCalls?.[0];
     if (!call?.name) {

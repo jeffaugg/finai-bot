@@ -5,6 +5,7 @@ import { TransactionRepository } from '../../src/repositories/TransactionReposit
 import { EventRepository } from '../../src/repositories/EventRepository';
 import { SnapshotRepository } from '../../src/repositories/SnapshotRepository';
 import { GamificationService } from '../../src/services/GamificationService';
+import { isCronAuthorized } from '../../src/utils/auth';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
@@ -20,6 +21,10 @@ const gamificationService = new GamificationService(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).send('Method Not Allowed');
+  }
+
+  if (!isCronAuthorized(req.headers.authorization, process.env.CRON_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

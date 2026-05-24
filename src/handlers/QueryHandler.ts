@@ -3,6 +3,7 @@ import { EventRepository } from '../repositories/EventRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { DateService } from '../services/DateService';
 import { Classification, ClassificationPeriod, User } from '../types';
+import { TIMEZONE } from '../types/constants';
 
 const LIST_LIMIT = 15;
 const DELETE_CANDIDATES_LIMIT = 5;
@@ -22,7 +23,7 @@ export class QueryHandler {
 
   async summary(ctx: Context, user: User, classification: Classification): Promise<void> {
     const period = classification.slots?.period ?? 'today';
-    const { start, end, label } = this.resolvePeriod(period, user.timezone);
+    const { start, end, label } = this.resolvePeriod(period);
 
     await this.eventRepo?.record(user.id, 'summary_queried', { period });
 
@@ -45,7 +46,7 @@ export class QueryHandler {
   async list(ctx: Context, user: User, classification: Classification): Promise<void> {
     const period = classification.slots?.period ?? 'month';
     const category = classification.slots?.category;
-    const { start, end, label } = this.resolvePeriod(period, user.timezone);
+    const { start, end, label } = this.resolvePeriod(period);
 
     const txs = await this.transactionRepo.listByPeriod(user.id, {
       start,
@@ -66,7 +67,7 @@ export class QueryHandler {
     const filterText = category ? ` com "${category}"` : '';
     let msg = `📋 *Gastos${filterText} ${label}:*\n`;
     for (const tx of visible) {
-      const dateStr = this.dateService.formatDate(tx.date, user.timezone);
+      const dateStr = this.dateService.formatDate(tx.date);
       msg += `  • ${dateStr} — ${tx.category}: R$ ${tx.amount.toFixed(2)}\n`;
     }
     if (truncated) {
@@ -100,7 +101,7 @@ export class QueryHandler {
 
     if (candidates.length === 1) {
       const tx = candidates[0];
-      const dateStr = this.dateService.formatDate(tx.date, user.timezone);
+      const dateStr = this.dateService.formatDate(tx.date);
       await ctx.reply(
         `Quer remover este gasto?\n${dateStr} — ${tx.category}: R$ ${tx.amount.toFixed(2)}`,
         Markup.inlineKeyboard([
@@ -114,7 +115,7 @@ export class QueryHandler {
     }
 
     const buttons = candidates.map((tx) => {
-      const dateStr = this.dateService.formatDate(tx.date, user.timezone);
+      const dateStr = this.dateService.formatDate(tx.date);
       const label = `${dateStr} — ${tx.category}: R$ ${tx.amount.toFixed(2)}`;
       return [Markup.button.callback(label, `confirm_delete:${tx.id}`)];
     });
@@ -126,7 +127,8 @@ export class QueryHandler {
     );
   }
 
-  private resolvePeriod(period: ClassificationPeriod, timezone: string): PeriodResolution {
+  private resolvePeriod(period: ClassificationPeriod): PeriodResolution {
+    const timezone = TIMEZONE;
     const now = new Date();
     switch (period) {
       case 'today': {

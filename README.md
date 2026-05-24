@@ -186,12 +186,14 @@ Cada pull request aciona automaticamente o workflow `.github/workflows/ci.yml`, 
 
 ## Cron
 
-| Endpoint | Cron | Descrição |
-|---|---|---|
-| `/api/cron/reminder` | `0 23 * * *` | Lembrete para usuários sem gasto no dia |
-| `/api/cron/daily-close` | `59 23 * * *` | Fechamento do dia (streaks e reserva) |
-| `/api/cron/monthly-report` | `0 8 1 * *` | Relatório do mês anterior |
-| `/api/cron/onboarding-nudge` | `0 21 * * *` | Reengajamento de onboardings incompletos |
+Os agendamentos da Vercel rodam em **UTC**; abaixo, a coluna "Horário (SP)" mostra o horário local pretendido (`America/Sao_Paulo`, UTC−3).
+
+| Endpoint | Cron (UTC) | Horário (SP) | Descrição |
+|---|---|---|---|
+| `/api/cron/reminder` | `0 2 * * *` | 23:00 | Lembrete para usuários sem gasto no dia |
+| `/api/cron/daily-close` | `59 2 * * *` | 23:59 | Fechamento do dia (streaks e reserva) |
+| `/api/cron/monthly-report` | `0 11 1 * *` | 08:00 (dia 1) | Relatório do mês anterior |
+| `/api/cron/onboarding-nudge` | `0 0 * * *` | 21:00 | Reengajamento de onboardings incompletos |
 
 ---
 
