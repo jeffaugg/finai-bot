@@ -126,6 +126,24 @@ export class TransactionRepository {
     return (data ?? []).map((t) => TransactionSchema.parse(t));
   }
 
+  async findLastExpense(userId: string): Promise<Transaction | null> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', 'EXPENSE')
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    return data ? TransactionSchema.parse(data) : null;
+  }
+
   async findRecentByDescription(
     userId: string,
     description: string,

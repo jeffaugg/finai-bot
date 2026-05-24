@@ -13,6 +13,7 @@ export type AgentAction =
   | { tool: 'consultar_resumo'; period?: ClassificationPeriod }
   | { tool: 'listar_transacoes'; period?: ClassificationPeriod; category?: string }
   | { tool: 'remover_transacao'; description: string }
+  | { tool: 'corrigir_ultimo_gasto'; amount: number; category?: string }
   | { tool: 'none'; text?: string };
 
 const argSchemas = {
@@ -25,6 +26,10 @@ const argSchemas = {
     category: z.string().min(1).optional(),
   }),
   remover_transacao: z.object({ description: z.string().min(1) }),
+  corrigir_ultimo_gasto: z.object({
+    new_amount: z.number().positive(),
+    new_category: z.string().min(1).optional(),
+  }),
 };
 
 const categoryProp: Schema = {
@@ -139,6 +144,27 @@ const TOOLS: FunctionDeclaration[] = [
       required: ['description'],
     },
   },
+  {
+    name: 'corrigir_ultimo_gasto',
+    description:
+      'Corrige o valor (e opcionalmente a categoria) do ÚLTIMO gasto registrado. Use quando o usuário se corrige. ' +
+      'Ex: "na verdade foi 50", "corrige o último para 80", "o último era em Lazer".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        new_amount: {
+          type: Type.NUMBER,
+          description: 'Novo valor do gasto em reais (R$), positivo.',
+        },
+        new_category: {
+          type: Type.STRING,
+          enum: [...CANONICAL_CATEGORIES],
+          description: 'Nova categoria (opcional). Omita para manter a categoria atual.',
+        },
+      },
+      required: ['new_amount'],
+    },
+  },
 ];
 
 const SYSTEM_INSTRUCTION =
@@ -149,6 +175,7 @@ const SYSTEM_INSTRUCTION =
   `- pergunta de resumo ("quanto gastei") → consultar_resumo\n` +
   `- pedido de lista detalhada → listar_transacoes\n` +
   `- pedido para remover/desfazer um gasto → remover_transacao\n` +
+  `- correção do valor/categoria do último gasto ("na verdade foi X") → corrigir_ultimo_gasto\n` +
   `Se a mensagem não for sobre finanças ou for só uma dúvida de uso, NÃO chame nenhuma ferramenta.\n` +
   `Ao registrar gasto/entrada, escolha uma categoria GENÉRICA da lista canônica: [${CANONICAL_CATEGORIES.join(', ')}]. ` +
   `Mapeie semanticamente (ração→Pet, jiu-jitsu→Exercícios, mercado→Alimentação). Use 'Outros' só se nada se aplicar.\n` +
@@ -211,6 +238,12 @@ function parseCall(name: string, args: Record<string, unknown>): AgentAction {
     case 'remover_transacao': {
       const p = argSchemas.remover_transacao.safeParse(args);
       return p.success ? { tool: 'remover_transacao', ...p.data } : { tool: 'none' };
+    }
+    case 'corrigir_ultimo_gasto': {
+      const p = argSchemas.corrigir_ultimo_gasto.safeParse(args);
+      return p.success
+        ? { tool: 'corrigir_ultimo_gasto', amount: p.data.new_amount, category: p.data.new_category }
+        : { tool: 'none' };
     }
     default:
       return { tool: 'none' };

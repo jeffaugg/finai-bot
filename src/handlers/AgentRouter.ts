@@ -59,6 +59,9 @@ export class AgentRouter {
           clf('DELETE_BY_DESCRIPTION', { description: action.description })
         );
 
+      case 'corrigir_ultimo_gasto':
+        return this.expenseHandler.correctLast(ctx, user, action.amount, action.category);
+
       case 'none':
         if (action.text) {
           await ctx.reply(action.text);

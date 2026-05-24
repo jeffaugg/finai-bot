@@ -82,6 +82,7 @@ export const UserEventType = z.enum([
   'daily_closed',
   'onboarding_nudge_sent',
   'salary_updated',
+  'transaction_corrected',
 ]);
 
 export type UserEventType = z.infer<typeof UserEventType>;

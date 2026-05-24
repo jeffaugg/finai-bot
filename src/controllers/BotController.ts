@@ -6,6 +6,7 @@ import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { EventRepository } from '../repositories/EventRepository';
 import { ConversationRepository } from '../repositories/ConversationRepository';
+import { FeedbackRepository } from '../repositories/FeedbackRepository';
 import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { ExpenseHandler } from '../handlers/ExpenseHandler';
 import { QueryHandler } from '../handlers/QueryHandler';
@@ -18,6 +19,7 @@ const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 const eventRepo = new EventRepository();
 const conversationRepo = new ConversationRepository();
+const feedbackRepo = new FeedbackRepository();
 const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
 const moderationService = new ModerationService();
 const agentService = new AgentService();
@@ -41,6 +43,8 @@ function modelTurnContent(action: AgentAction): string {
       return 'Mostrei a lista de transações.';
     case 'remover_transacao':
       return 'Pedi confirmação para remover um gasto.';
+    case 'corrigir_ultimo_gasto':
+      return `Corrigi o último gasto para R$ ${action.amount.toFixed(2)}.`;
     case 'none':
       return action.text ?? '';
   }
@@ -92,6 +96,29 @@ export const setupBotCommands = () => {
     } catch (error) {
       console.error('Erro no /status:', error);
       await ctx.reply('⚠️ Não consegui buscar seu status agora. Tente em instantes.');
+    }
+  });
+
+  bot.command('feedback', async (ctx) => {
+    const content = ctx.message.text.replace(/^\/feedback(@\w+)?\s*/i, '').trim();
+    if (!content) {
+      await ctx.reply(
+        '💬 Mande seu feedback logo após o comando. Ex: "/feedback adoraria um gráfico mensal".'
+      );
+      return;
+    }
+
+    try {
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (!user) {
+        await ctx.reply('⚠️ Cadastro não encontrado. Digite /start para começar.');
+        return;
+      }
+      await feedbackRepo.create(user.id, content);
+      await ctx.reply('🙏 Obrigado pelo feedback! Sua opinião ajuda a melhorar o bot.');
+    } catch (error) {
+      console.error('Erro no /feedback:', error);
+      await ctx.reply('⚠️ Não consegui salvar seu feedback agora. Tente em instantes.');
     }
   });
 
@@ -193,6 +220,44 @@ export const setupBotCommands = () => {
       await ctx.answerCbQuery();
     } catch (error) {
       console.error('Erro no cancel_delete:', error);
+      await ctx.answerCbQuery();
+    }
+  });
+
+  bot.action(/^confirm_expense:(\d+(?:\.\d+)?):(.+)$/, async (ctx) => {
+    const amount = Number(ctx.match[1]);
+    const category = ctx.match[2];
+
+    try {
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (!user) {
+        await ctx.answerCbQuery('⚠️ Cadastro não encontrado.');
+        return;
+      }
+
+      const result = await gamificationService.processFinancialEvent(
+        user.telegram_id,
+        { intent: 'EXPENSE', amount, category },
+        `${category} (R$ ${amount.toFixed(2)})`
+      );
+      await ctx.editMessageText(result.message);
+      await ctx.answerCbQuery();
+    } catch (error) {
+      console.error('Erro ao confirmar gasto:', error);
+      if (error instanceof AppError) {
+        await ctx.answerCbQuery(error.userMessage);
+      } else {
+        await ctx.answerCbQuery('⚠️ Não consegui registrar. Tente novamente.');
+      }
+    }
+  });
+
+  bot.action('cancel_expense', async (ctx) => {
+    try {
+      await ctx.editMessageText('❌ Gasto não registrado.');
+      await ctx.answerCbQuery();
+    } catch (error) {
+      console.error('Erro no cancel_expense:', error);
       await ctx.answerCbQuery();
     }
   });

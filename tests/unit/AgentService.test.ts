@@ -110,6 +110,18 @@ describe('AgentService.interpret', () => {
     mockCall('registrar_gasto', { amount: 10, category: 'Outros' });
     await svc.interpret('gastei 10');
     const config = generateContent.mock.calls[0][0].config;
-    expect(config.tools[0].functionDeclarations).toHaveLength(6);
+    expect(config.tools[0].functionDeclarations).toHaveLength(7);
+  });
+
+  it('mapeia corrigir_ultimo_gasto sem categoria', async () => {
+    mockCall('corrigir_ultimo_gasto', { new_amount: 50 });
+    const action = await svc.interpret('na verdade foi 50');
+    expect(action).toEqual({ tool: 'corrigir_ultimo_gasto', amount: 50 });
+  });
+
+  it('mapeia corrigir_ultimo_gasto com nova categoria', async () => {
+    mockCall('corrigir_ultimo_gasto', { new_amount: 80, new_category: 'Lazer' });
+    const action = await svc.interpret('corrige o último para 80 em lazer');
+    expect(action).toEqual({ tool: 'corrigir_ultimo_gasto', amount: 80, category: 'Lazer' });
   });
 });

@@ -23,7 +23,7 @@ function makeUser(): User {
   };
 }
 
-const expenseHandler = { handle: vi.fn() };
+const expenseHandler = { handle: vi.fn(), correctLast: vi.fn() };
 const queryHandler = { summary: vi.fn(), list: vi.fn(), deleteByDescription: vi.fn() };
 const smallTalkHandler = { help: vi.fn() };
 
@@ -38,6 +38,7 @@ const ctx = { reply } as never;
 
 beforeEach(() => {
   expenseHandler.handle.mockReset();
+  expenseHandler.correctLast.mockReset();
   queryHandler.summary.mockReset();
   queryHandler.list.mockReset();
   queryHandler.deleteByDescription.mockReset();
@@ -132,6 +133,17 @@ describe('AgentRouter.dispatch', () => {
       expect.anything(),
       expect.objectContaining({ intent: 'DELETE_BY_DESCRIPTION', slots: { description: 'mercado' } })
     );
+  });
+
+  it('corrigir_ultimo_gasto → ExpenseHandler.correctLast', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'corrigir_ultimo_gasto', amount: 50, category: 'Lazer' },
+      'corrige pra 50'
+    );
+
+    expect(expenseHandler.correctLast).toHaveBeenCalledWith(ctx, expect.anything(), 50, 'Lazer');
   });
 
   it('none sem texto → SmallTalkHandler.help', async () => {
