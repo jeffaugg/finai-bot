@@ -24,12 +24,15 @@
 | Funcionalidade | Descrição |
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
-| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover) em uma única chamada ao Gemini |
+| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover, corrigir último gasto) em uma única chamada ao Gemini |
 | **Conversa multi-turn** | O agente usa o histórico recente para pedir o que faltar ("gastei no mercado" → "quanto?") e dar coaching reativo após um estouro |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
 | **Resumo de gastos** | "Quanto gastei hoje/essa semana/esse mês?" com totais por categoria |
 | **Listagem de transações** | "Me mostra meus gastos com lazer" com filtro e paginação |
 | **Exclusão conversacional** | "Remove meu último gasto no mercado" com confirmação inline |
+| **Confirmação de valor alto** | Gastos a partir de `HIGH_VALUE_THRESHOLD` (R$ 500) pedem confirmação inline antes de gravar |
+| **Correção do último gasto** | "Na verdade foi 80" desfaz e recria o último gasto preservando a data, registrando o evento de correção |
+| **Feedback do usuário** | `/feedback <texto>` grava sugestões livres como insumo qualitativo para a pesquisa |
 | **Gamificação com Streaks** | Mantenha gastos abaixo do limite diário para estender a ofensiva |
 | **Reserva de Sucesso** | Economia diária acumula como colchão para dias de maior gasto |
 | **Lembretes inteligentes** | Cron de lembretes só dispara para usuários sem gasto no dia |
@@ -58,7 +61,44 @@
 
 ### Fluxo Conversacional
 
-![Fluxo de processamento de mensagens do FinAI](docs/assets/fluxo.drawio.svg)
+Uma mensagem de texto passa por um *gate* de onboarding, moderação pré-IA, uma **única** chamada ao Gemini com *function calling* e o roteamento da tool escolhida para o handler de domínio:
+
+```mermaid
+flowchart TD
+    TG(["📩 Telegram update (webhook)"]) --> BC["BotController · bot.on('text')"]
+    BC --> OG{"onboarding_step<br/>= 'completed'?"}
+    OG -->|"não"| OH["🧭 OnboardingHandler.continue<br/>(state machine · 5 etapas)"]
+    OG -->|"sim"| MOD{"1 · ModerationService.preCheck"}
+    MOD -->|"saudação / off-topic / curto"| CANNED["💬 Resposta pronta<br/>(sem chamar IA)"]
+    MOD -->|"passa"| AG["2 · AgentService.interpret<br/>— 1 chamada Gemini (function calling) —<br/>+ janela recente (ConversationRepository)"]
+    AG --> ZOD["Valida response.functionCalls com Zod<br/>→ AgentAction"]
+    ZOD --> ROUTER{"3 · AgentRouter.dispatch"}
+
+    ROUTER -->|"registrar_gasto / registrar_entrada / atualizar_salario"| EXP["💳 ExpenseHandler.handle"]
+    EXP --> HV{"valor ≥ HIGH_VALUE_THRESHOLD?"}
+    HV -->|"sim"| CONF["⚠️ Confirmação inline<br/>antes de gravar"]
+    HV -->|"não"| GAM["GamificationService<br/>.processFinancialEvent"]
+    CONF -->|"confirma"| GAM
+
+    ROUTER -->|"corrigir_ultimo_gasto"| CORR["✏️ ExpenseHandler.correctLast<br/>→ correctLastExpense (desfaz + recria)"]
+    ROUTER -->|"consultar_resumo"| QS["📊 QueryHandler.summary"]
+    ROUTER -->|"listar_transacoes"| QL["📋 QueryHandler.list"]
+    ROUTER -->|"remover_transacao"| QD["🗑️ QueryHandler.deleteByDescription<br/>(confirmação inline)"]
+    ROUTER -->|"none + texto"| FU["💬 Follow-up multi-turn<br/>(responde o texto do modelo)"]
+    ROUTER -->|"none (sem texto)"| ST["👋 SmallTalkHandler.help"]
+
+    GAM --> DB[("Supabase<br/>transactions · user_events · daily_snapshots")]
+    CORR --> DB
+
+    classDef ai fill:#d1ecf1,stroke:#17a2b8,color:#000;
+    classDef gate fill:#fff3cd,stroke:#ffc107,color:#000;
+    classDef canned fill:#f0f0f0,stroke:#999,color:#000;
+    classDef domain fill:#d4edda,stroke:#28a745,color:#000;
+    class AG ai;
+    class OG,MOD,ROUTER,HV gate;
+    class CANNED,FU,ST,OH canned;
+    class GAM,CORR,DB domain;
+```
 
 ### Estrutura de Diretórios
 
@@ -67,7 +107,8 @@ finai-bot/
 ├── api/
 │   ├── webhook.ts          
 │   └── cron/               
-├── docs/assets/            
+├── docs/
+│   └── PROGRESSO.md        
 ├── scripts/
 │   └── migrate.ts          
 ├── src/
@@ -115,6 +156,8 @@ cp .env.example .env
 | `SUPABASE_SERVICE_KEY` | Chave `service_role` do Supabase (nunca exponha no cliente) | `eyJ...` |
 | `GEMINI_API_KEY` | Chave do Google AI Studio | `AIza...` |
 | `DATABASE_URL` | URL de conexão direta ao PostgreSQL (para migrations) | `postgresql://postgres:senha@db.xyz.supabase.co:5432/postgres` |
+| `TELEGRAM_WEBHOOK_SECRET` | *(opcional)* secret_token do webhook; se definido, é validado no header `x-telegram-bot-api-secret-token` | `um-valor-aleatório` |
+| `CRON_SECRET` | *(opcional)* protege os endpoints `/api/cron/*`; a Vercel envia `Authorization: Bearer <CRON_SECRET>` | `um-valor-aleatório` |
 
 > **Atenção:** `SUPABASE_SERVICE_KEY` e `DATABASE_URL` contêm credenciais de alto privilégio. Nunca as inclua em commits ou logs.
 
@@ -169,13 +212,16 @@ pnpm test:coverage
 
 Os testes unitários ficam em `tests/unit/` e cobrem:
 
-- **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês
+- **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês, helpers de data local
 - **`ModerationService`** — heurísticas de saudação, comprimento, off-topic
 - **`AgentService`** — function calling do Gemini: mapeia cada tool, valida args com Zod, fallback para `none`
 - **`AgentRouter`** — despacho correto de cada tool para o handler
-- **`GamificationService`** — fechamento diário (3 desfechos, idempotência, dias pulados) e status
+- **`ExpenseHandler`** — confirmação de valor alto e correção do último gasto
+- **`GamificationService`** — fechamento diário (3 desfechos, idempotência, dias pulados), emissão de eventos, correção e status
 - **`OnboardingHandler`** — todas as 5 transições de estado
 - **`QueryHandler`** — resumo, listagem, exclusão por descrição
+- **Repositórios** — `EventRepository` (append-only best-effort), `SnapshotRepository` (idempotência por data), `ConversationRepository` (janela recente), `FeedbackRepository`
+- **`retry` / `auth`** — backoff exponencial do `withRetry` e autorização de webhook/cron
 - **`parse`** — parseAmount e parsePercentage com variantes BR
 
 ### Integração Contínua
