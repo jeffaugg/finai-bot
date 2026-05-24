@@ -59,22 +59,6 @@ export class TransactionRepository {
     return (data ?? []).reduce((acc, curr) => acc + Number(curr.amount), 0);
   }
 
-  async getDistinctCategories(userId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('category')
-      .eq('user_id', userId)
-      .eq('type', 'EXPENSE')
-      .is('deleted_at', null);
-
-    if (error) {
-      throw new DatabaseError(error.message);
-    }
-
-    const unique = [...new Set((data ?? []).map((t) => t.category as string))];
-    return unique.sort();
-  }
-
   async getMonthlySummary(
     userId: string,
     year: number,

@@ -1,8 +1,7 @@
 import { bot } from '../config/clients';
-import { ExtractionService } from '../services/ExtractionService';
+import { AgentService } from '../services/AgentService';
 import { GamificationService } from '../services/GamificationService';
 import { ModerationService } from '../services/ModerationService';
-import { ClassificationService } from '../services/ClassificationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { EventRepository } from '../repositories/EventRepository';
@@ -10,22 +9,21 @@ import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { ExpenseHandler } from '../handlers/ExpenseHandler';
 import { QueryHandler } from '../handlers/QueryHandler';
 import { SmallTalkHandler } from '../handlers/SmallTalkHandler';
-import { IntentRouter } from '../handlers/IntentRouter';
+import { AgentRouter } from '../handlers/AgentRouter';
 import { message } from 'telegraf/filters';
 import { AppError } from '../types/errors';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
 const eventRepo = new EventRepository();
-const extractionService = new ExtractionService();
 const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
 const moderationService = new ModerationService();
-const classificationService = new ClassificationService();
+const agentService = new AgentService();
 const onboardingHandler = new OnboardingHandler(userRepo, eventRepo);
-const expenseHandler = new ExpenseHandler(extractionService, gamificationService, transactionRepo);
+const expenseHandler = new ExpenseHandler(gamificationService);
 const queryHandler = new QueryHandler(transactionRepo, eventRepo);
 const smallTalkHandler = new SmallTalkHandler();
-const intentRouter = new IntentRouter(expenseHandler, queryHandler, smallTalkHandler);
+const agentRouter = new AgentRouter(expenseHandler, queryHandler, smallTalkHandler);
 
 export const setupBotCommands = () => {
   bot.start(async (ctx) => {
@@ -255,8 +253,8 @@ export const setupBotCommands = () => {
     }
 
     try {
-      const classification = await classificationService.classify(userText);
-      await intentRouter.dispatch(ctx, user, userText, classification);
+      const action = await agentService.interpret(userText);
+      await agentRouter.dispatch(ctx, user, action, userText);
     } catch (error) {
       console.error('Erro ao processar mensagem:', error);
       if (error instanceof AppError) {

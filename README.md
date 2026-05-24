@@ -24,7 +24,7 @@
 | Funcionalidade | Descrição |
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
-| **Pipeline dupla de IA** | ClassificationService classifica a intenção; ExtractionService extrai dados financeiros |
+| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover) em uma única chamada ao Gemini |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
 | **Resumo de gastos** | "Quanto gastei hoje/essa semana/esse mês?" com totais por categoria |
 | **Listagem de transações** | "Me mostra meus gastos com lazer" com filtro e paginação |
@@ -168,10 +168,11 @@ Os testes unitários ficam em `tests/unit/` e cobrem:
 
 - **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês
 - **`ModerationService`** — heurísticas de saudação, comprimento, off-topic
-- **`ClassificationService`** — parsing de JSON do Gemini, fallback para OUT_OF_SCOPE
+- **`AgentService`** — function calling do Gemini: mapeia cada tool, valida args com Zod, fallback para `none`
+- **`AgentRouter`** — despacho correto de cada tool para o handler
+- **`GamificationService`** — fechamento diário (3 desfechos, idempotência, dias pulados) e status
 - **`OnboardingHandler`** — todas as 5 transições de estado
 - **`QueryHandler`** — resumo, listagem, exclusão por descrição
-- **`IntentRouter`** — despacho correto por intent
 - **`parse`** — parseAmount e parsePercentage com variantes BR
 
 ### Integração Contínua
