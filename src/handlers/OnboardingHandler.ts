@@ -1,4 +1,5 @@
 import { Context, Markup } from 'telegraf';
+import { EventRepository } from '../repositories/EventRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { OnboardingStep, User } from '../types';
 import { parseAmount, parsePercentage } from '../utils/parse';
@@ -17,13 +18,17 @@ function calcDailyLimit(monthlyIncome: number, fixedExpenses: number, savingPct:
 }
 
 export class OnboardingHandler {
-  constructor(private readonly userRepo: UserRepository) {}
+  constructor(
+    private readonly userRepo: UserRepository,
+    private readonly eventRepo?: EventRepository
+  ) {}
 
   async startFromScratch(ctx: Context, user: User): Promise<User> {
     await ctx.reply(
       `Olá, ${ctx.from?.first_name ?? ''}! 🚀\n\n` +
         `Sou seu assistente financeiro gamificado. Vou te fazer 4 perguntas rápidas para configurar sua jornada.`
     );
+    await this.eventRepo?.record(user.id, 'onboarding_started');
     return this.askSalary(ctx, user);
   }
 
@@ -84,6 +89,11 @@ export class OnboardingHandler {
       reminders_enabled: accepted,
       daily_limit: dailyLimit,
       onboarding_step: 'completed',
+    });
+
+    await this.eventRepo?.record(user.id, 'onboarding_completed', {
+      daily_limit: dailyLimit,
+      reminders_enabled: accepted,
     });
 
     await ctx.editMessageText(

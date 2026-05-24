@@ -5,6 +5,7 @@ import { ModerationService } from '../services/ModerationService';
 import { ClassificationService } from '../services/ClassificationService';
 import { UserRepository } from '../repositories/UserRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
+import { EventRepository } from '../repositories/EventRepository';
 import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { ExpenseHandler } from '../handlers/ExpenseHandler';
 import { QueryHandler } from '../handlers/QueryHandler';
@@ -15,13 +16,14 @@ import { AppError } from '../types/errors';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
+const eventRepo = new EventRepository();
 const extractionService = new ExtractionService();
-const gamificationService = new GamificationService(userRepo, transactionRepo);
+const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
 const moderationService = new ModerationService();
 const classificationService = new ClassificationService();
-const onboardingHandler = new OnboardingHandler(userRepo);
+const onboardingHandler = new OnboardingHandler(userRepo, eventRepo);
 const expenseHandler = new ExpenseHandler(extractionService, gamificationService, transactionRepo);
-const queryHandler = new QueryHandler(transactionRepo);
+const queryHandler = new QueryHandler(transactionRepo, eventRepo);
 const smallTalkHandler = new SmallTalkHandler();
 const intentRouter = new IntentRouter(expenseHandler, queryHandler, smallTalkHandler);
 
@@ -123,6 +125,10 @@ export const setupBotCommands = () => {
       }
 
       await transactionRepo.softDelete(transactionId, user.id);
+      await eventRepo.record(user.id, 'transaction_undone', {
+        transaction_id: transactionId,
+        via: 'undo',
+      });
       await ctx.editMessageText('✅ Gasto desfeito com sucesso!');
       await ctx.answerCbQuery();
     } catch (error) {
@@ -146,6 +152,10 @@ export const setupBotCommands = () => {
       }
 
       await transactionRepo.softDelete(transactionId, user.id);
+      await eventRepo.record(user.id, 'transaction_undone', {
+        transaction_id: transactionId,
+        via: 'delete',
+      });
       await ctx.editMessageText('✅ Gasto removido com sucesso!');
       await ctx.answerCbQuery();
     } catch (error) {
@@ -170,6 +180,10 @@ export const setupBotCommands = () => {
 
   bot.action('reminder_done', async (ctx) => {
     try {
+      const user = await userRepo.findByTelegramId(ctx.from.id);
+      if (user) {
+        await eventRepo.record(user.id, 'reminder_answered', { action: 'done' });
+      }
       await ctx.editMessageText('✅ Ótimo! Seus gastos de hoje estão registrados. Continue assim! 🔥');
       await ctx.answerCbQuery();
     } catch (error) {
@@ -186,6 +200,7 @@ export const setupBotCommands = () => {
         await userRepo.updateUser(user.id, {
           snooze_until: snoozeUntil,
         });
+        await eventRepo.record(user.id, 'reminder_answered', { action: 'snooze' });
       }
       await ctx.editMessageText('⏰ Ok! Vou te lembrar novamente em 1 hora.');
       await ctx.answerCbQuery();

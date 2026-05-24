@@ -1,8 +1,10 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { bot } from '../../src/config/clients';
 import { UserRepository } from '../../src/repositories/UserRepository';
+import { EventRepository } from '../../src/repositories/EventRepository';
 
 const userRepo = new UserRepository();
+const eventRepo = new EventRepository();
 
 const STALE_AFTER_HOURS = 24;
 
@@ -24,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         await bot.telegram.sendMessage(user.telegram_id, NUDGE_MESSAGE);
         await userRepo.markOnboardingNudged(user.id);
+        await eventRepo.record(user.id, 'onboarding_nudge_sent');
         results.sent++;
       } catch (err) {
         console.error(`Erro ao enviar nudge para ${user.telegram_id}:`, err);

@@ -1,4 +1,5 @@
 import { Context, Markup } from 'telegraf';
+import { EventRepository } from '../repositories/EventRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { DateService } from '../services/DateService';
 import { Classification, ClassificationPeriod, User } from '../types';
@@ -15,12 +16,15 @@ interface PeriodResolution {
 export class QueryHandler {
   constructor(
     private readonly transactionRepo: TransactionRepository,
+    private readonly eventRepo?: EventRepository,
     private readonly dateService: DateService = new DateService()
   ) {}
 
   async summary(ctx: Context, user: User, classification: Classification): Promise<void> {
     const period = classification.slots?.period ?? 'today';
     const { start, end, label } = this.resolvePeriod(period, user.timezone);
+
+    await this.eventRepo?.record(user.id, 'summary_queried', { period });
 
     const summary = await this.transactionRepo.getCategorySummary(user.id, start, end);
 

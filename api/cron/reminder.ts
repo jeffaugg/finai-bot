@@ -2,8 +2,10 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { Markup } from 'telegraf';
 import { bot } from '../../src/config/clients';
 import { UserRepository } from '../../src/repositories/UserRepository';
+import { EventRepository } from '../../src/repositories/EventRepository';
 
 const userRepo = new UserRepository();
+const eventRepo = new EventRepository();
 
 const REMINDER_MESSAGE =
   '📢 Ei! Você ainda não registrou nenhum gasto hoje.\n' +
@@ -26,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const user of users) {
       try {
         await bot.telegram.sendMessage(user.telegram_id, REMINDER_MESSAGE, keyboard);
+        await eventRepo.record(user.id, 'reminder_sent');
         results.sent++;
       } catch (err) {
         console.error(`Erro ao enviar lembrete para ${user.telegram_id}:`, err);

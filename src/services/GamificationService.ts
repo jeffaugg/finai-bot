@@ -1,3 +1,4 @@
+import { EventRepository } from '../repositories/EventRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { FinancialEventResult, GeminiExtraction, User } from '../types';
@@ -8,7 +9,8 @@ const dateService = new DateService();
 export class GamificationService {
   constructor(
     private readonly userRepo: UserRepository,
-    private readonly transactionRepo: TransactionRepository
+    private readonly transactionRepo: TransactionRepository,
+    private readonly eventRepo?: EventRepository
   ) {}
 
   async processFinancialEvent(
@@ -43,7 +45,7 @@ export class GamificationService {
   ): Promise<FinancialEventResult> {
     const newReserve = Number(user.success_reserve) + data.amount;
 
-    await this.transactionRepo.create({
+    const transaction = await this.transactionRepo.create({
       user_id: user.id,
       amount: data.amount,
       category: data.category,
@@ -54,6 +56,13 @@ export class GamificationService {
     });
 
     await this.userRepo.updateUser(user.id, { success_reserve: newReserve });
+
+    await this.eventRepo?.record(user.id, 'transaction_recorded', {
+      transaction_id: transaction.id,
+      amount: data.amount,
+      category: data.category,
+      type: 'INFLOW',
+    });
 
     return {
       message:
@@ -79,6 +88,11 @@ export class GamificationService {
       daily_limit: novoLimiteDiario,
     });
 
+    await this.eventRepo?.record(user.id, 'salary_updated', {
+      monthly_income: novaRenda,
+      daily_limit: novoLimiteDiario,
+    });
+
     return {
       message:
         `📈 Renda atualizada para R$ ${novaRenda.toFixed(2)}!\n` +
@@ -99,6 +113,13 @@ export class GamificationService {
       raw_text: rawText,
       date: new Date(),
       deleted_at: null,
+    });
+
+    await this.eventRepo?.record(user.id, 'transaction_recorded', {
+      transaction_id: transaction.id,
+      amount: data.amount,
+      category: data.category,
+      type: 'EXPENSE',
     });
 
     const totalGastoHoje = await this.transactionRepo.getDailyExpenseTotal(user.id);

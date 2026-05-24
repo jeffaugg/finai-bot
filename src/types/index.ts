@@ -71,6 +71,66 @@ export const TransactionSchema = z.object({
   deleted_at: z.coerce.date().nullable(),
 });
 
+export const UserEventType = z.enum([
+  'onboarding_started',
+  'onboarding_completed',
+  'transaction_recorded',
+  'transaction_undone',
+  'summary_queried',
+  'reminder_sent',
+  'reminder_answered',
+  'daily_closed',
+  'onboarding_nudge_sent',
+  'salary_updated',
+]);
+
+export type UserEventType = z.infer<typeof UserEventType>;
+
+export interface UserEvent {
+  id: string;
+  user_id: string;
+  type: UserEventType;
+  payload: Record<string, unknown>;
+  created_at: Date;
+}
+
+export const UserEventSchema = z.object({
+  id: z.uuid(),
+  user_id: z.uuid(),
+  type: UserEventType,
+  payload: z.record(z.string(), z.unknown()),
+  created_at: z.coerce.date(),
+});
+
+export const CloseResult = z.enum(['success', 'reserve_used', 'streak_reset']);
+export type CloseResult = z.infer<typeof CloseResult>;
+
+export interface DailySnapshot {
+  id: string;
+  user_id: string;
+  snapshot_date: Date;
+  current_streak: number;
+  success_reserve: number;
+  daily_limit: number;
+  total_spent: number;
+  had_activity: boolean;
+  close_result: CloseResult;
+  created_at: Date;
+}
+
+export const DailySnapshotSchema = z.object({
+  id: z.uuid(),
+  user_id: z.uuid(),
+  snapshot_date: z.coerce.date(),
+  current_streak: z.coerce.number(),
+  success_reserve: z.coerce.number(),
+  daily_limit: z.coerce.number(),
+  total_spent: z.coerce.number(),
+  had_activity: z.boolean(),
+  close_result: CloseResult,
+  created_at: z.coerce.date(),
+});
+
 export const IntentEnum = z.enum(['EXPENSE', 'INFLOW', 'UPDATE_SALARY']);
 
 export const GeminiExtractionSchema = z.object({
