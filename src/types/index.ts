@@ -186,3 +186,23 @@ export const ClassificationSchema = z.object({
 });
 
 export type Classification = z.infer<typeof ClassificationSchema>;
+
+export interface CapabilityGap {
+  id: string;
+  user_id: string;
+  input_text: string;
+  intent: string;
+  reason: string;
+  suggestion: string;
+  created_at: Date;
+}
+
+export const CapabilityGapSchema = z.object({
+  id: z.uuid(),
+  user_id: z.uuid(),
+  input_text: z.string(),
+  intent: z.string(),
+  reason: z.string(),
+  suggestion: z.string(),
+  created_at: z.coerce.date(),
+});
