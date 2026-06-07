@@ -328,17 +328,27 @@ export class GamificationService {
     }
 
     const totalGastoHoje = await this.transactionRepo.getDailyExpenseTotal(user.id);
-    const limiteRestante = Number(user.daily_limit) - totalGastoHoje;
-
-    return (
-      `📊 *Seu status financeiro:*\n\n` +
-      `🔥 Sequência: ${user.current_streak} dia${user.current_streak !== 1 ? 's' : ''} (recorde: ${user.max_streak})\n` +
-      `🛡️ Reserva de Sucesso: R$ ${Number(user.success_reserve).toFixed(2)}\n` +
-      `💰 Limite diário: R$ ${Number(user.daily_limit).toFixed(2)}\n` +
-      `📉 Gasto hoje: R$ ${totalGastoHoje.toFixed(2)}\n` +
-      (limiteRestante >= 0
-        ? `✅ Restam: R$ ${limiteRestante.toFixed(2)} hoje`
-        : `🚨 Estourou: R$ ${Math.abs(limiteRestante).toFixed(2)} acima do limite`)
-    );
+    return formatStatus(user, totalGastoHoje);
   }
+}
+
+export function formatBudget(user: User, totalGastoHoje: number): string {
+  const limiteRestante = Number(user.daily_limit) - totalGastoHoje;
+
+  return (
+    `💰 Limite diário: R$ ${Number(user.daily_limit).toFixed(2)}\n` +
+    `📉 Gasto hoje: R$ ${totalGastoHoje.toFixed(2)}\n` +
+    (limiteRestante >= 0
+      ? `✅ Restam: R$ ${limiteRestante.toFixed(2)} hoje`
+      : `🚨 Estourou: R$ ${Math.abs(limiteRestante).toFixed(2)} acima do limite`)
+  );
+}
+
+export function formatStatus(user: User, totalGastoHoje: number): string {
+  return (
+    `📊 *Seu status financeiro:*\n\n` +
+    `🔥 Sequência: ${user.current_streak} dia${user.current_streak !== 1 ? 's' : ''} (recorde: ${user.max_streak})\n` +
+    `🛡️ Reserva de Sucesso: R$ ${Number(user.success_reserve).toFixed(2)}\n` +
+    formatBudget(user, totalGastoHoje)
+  );
 }

@@ -1,3 +1,4 @@
+import { ClassificationPeriod } from '../types';
 import { TIMEZONE } from '../types/constants';
 
 interface DateParts {
@@ -123,6 +124,41 @@ export class DateService {
     const today = this.getDayBounds(timezone, ref);
     const start = new Date(today.start.getTime() - 6 * 24 * 60 * 60 * 1000);
     return { start, end: today.end };
+  }
+
+  getPreviousPeriodBounds(
+    period: ClassificationPeriod,
+    ref: Date = new Date()
+  ): { start: Date; end: Date } {
+    const tz = this.defaultTimezone;
+    const todayStr = this.getCurrentLocalDateString(tz, ref);
+    const [year, month] = todayStr.split('-').map(Number);
+
+    switch (period) {
+      case 'today':
+        return this.getDayBoundsForLocalDate(this.addDays(todayStr, -1), tz);
+      case 'yesterday':
+        return this.getDayBoundsForLocalDate(this.addDays(todayStr, -2), tz);
+      case 'week': {
+        const start = this.getDayBoundsForLocalDate(this.addDays(todayStr, -13), tz).start;
+        const end = this.getDayBoundsForLocalDate(this.addDays(todayStr, -7), tz).end;
+        return { start, end };
+      }
+      case 'month': {
+        const prevMonth = month === 1 ? 12 : month - 1;
+        const prevYear = month === 1 ? year - 1 : year;
+        return this.getMonthBounds(prevYear, prevMonth, tz);
+      }
+      case 'last_month': {
+        let y = year;
+        let m = month - 2;
+        while (m < 1) {
+          m += 12;
+          y -= 1;
+        }
+        return this.getMonthBounds(y, m, tz);
+      }
+    }
   }
 
   formatDate(date: Date, timezone: string = this.defaultTimezone): string {

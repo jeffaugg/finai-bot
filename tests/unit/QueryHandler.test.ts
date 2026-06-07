@@ -47,6 +47,8 @@ const repoStub = {
   getCategorySummary: vi.fn(),
   listByPeriod: vi.fn(),
   findRecentByDescription: vi.fn(),
+  getDailyExpenseTotal: vi.fn(),
+  getPeriodTotals: vi.fn(),
 };
 
 const handler = new QueryHandler(repoStub as never);
@@ -55,6 +57,8 @@ beforeEach(() => {
   repoStub.getCategorySummary.mockReset();
   repoStub.listByPeriod.mockReset();
   repoStub.findRecentByDescription.mockReset();
+  repoStub.getDailyExpenseTotal.mockReset();
+  repoStub.getPeriodTotals.mockReset();
 });
 
 function clf(intent: Classification['intent'], slots?: Classification['slots']): Classification {
@@ -134,6 +138,98 @@ describe('QueryHandler.list', () => {
     await handler.list(ctx as never, makeUser(), clf('QUERY_LIST', { period: 'month' }));
 
     expect(ctx.reply.mock.calls[0][0]).toMatch(/últimos 15/);
+  });
+});
+
+describe('QueryHandler.summary sideloads', () => {
+  it('inclui as transações quando incluir_transacoes', async () => {
+    repoStub.getCategorySummary.mockResolvedValue([{ category: 'mercado', total: 40 }]);
+    repoStub.listByPeriod.mockResolvedValue([makeTx({ category: 'mercado', amount: 40 })]);
+    const ctx = makeCtx();
+
+    await handler.summary(ctx as never, makeUser(), clf('QUERY_SUMMARY', { period: 'today' }), {
+      incluirTransacoes: true,
+    });
+
+    expect(repoStub.listByPeriod).toHaveBeenCalled();
+    expect(ctx.reply.mock.calls[0][0]).toContain('Transações');
+  });
+
+  it('inclui a comparação com o período anterior quando incluir_comparacao', async () => {
+    repoStub.getCategorySummary
+      .mockResolvedValueOnce([{ category: 'mercado', total: 120 }])
+      .mockResolvedValueOnce([{ category: 'mercado', total: 100 }]);
+    const ctx = makeCtx();
+
+    await handler.summary(ctx as never, makeUser(), clf('QUERY_SUMMARY', { period: 'today' }), {
+      incluirComparacao: true,
+    });
+
+    expect(repoStub.getCategorySummary).toHaveBeenCalledTimes(2);
+    expect(ctx.reply.mock.calls[0][0]).toMatch(/20% a mais que ontem/);
+  });
+});
+
+describe('QueryHandler.dailyBudget', () => {
+  it('mostra quanto resta do limite', async () => {
+    repoStub.getDailyExpenseTotal.mockResolvedValue(30);
+    const ctx = makeCtx();
+
+    await handler.dailyBudget(ctx as never, makeUser());
+
+    expect(ctx.reply.mock.calls[0][0]).toContain('R$ 50.00');
+  });
+
+  it('avisa quando estourou o limite', async () => {
+    repoStub.getDailyExpenseTotal.mockResolvedValue(100);
+    const ctx = makeCtx();
+
+    await handler.dailyBudget(ctx as never, makeUser());
+
+    expect(ctx.reply.mock.calls[0][0]).toMatch(/passou do limite/);
+  });
+});
+
+describe('QueryHandler.progress', () => {
+  it('mostra streak e reserva sem tocar no banco por padrão', async () => {
+    const ctx = makeCtx();
+
+    await handler.progress(ctx as never, makeUser());
+
+    expect(repoStub.getDailyExpenseTotal).not.toHaveBeenCalled();
+    expect(ctx.reply.mock.calls[0][0]).toMatch(/Sequência/);
+  });
+
+  it('anexa o limite de hoje quando incluirLimiteHoje', async () => {
+    repoStub.getDailyExpenseTotal.mockResolvedValue(30);
+    const ctx = makeCtx();
+
+    await handler.progress(ctx as never, makeUser(), true);
+
+    expect(repoStub.getDailyExpenseTotal).toHaveBeenCalled();
+    expect(ctx.reply.mock.calls[0][0]).toContain('Restam: R$ 50.00');
+  });
+});
+
+describe('QueryHandler.monthlyBalance', () => {
+  it('calcula renda menos gastos', async () => {
+    repoStub.getPeriodTotals.mockResolvedValue({ inflow: 0, expense: 1000 });
+    const ctx = makeCtx();
+
+    await handler.monthlyBalance(ctx as never, makeUser());
+
+    expect(ctx.reply.mock.calls[0][0]).toContain('Sobrou: R$ 2000.00');
+  });
+
+  it('inclui breakdown por categoria quando pedido', async () => {
+    repoStub.getPeriodTotals.mockResolvedValue({ inflow: 0, expense: 1000 });
+    repoStub.getCategorySummary.mockResolvedValue([{ category: 'mercado', total: 1000 }]);
+    const ctx = makeCtx();
+
+    await handler.monthlyBalance(ctx as never, makeUser(), true);
+
+    expect(repoStub.getCategorySummary).toHaveBeenCalled();
+    expect(ctx.reply.mock.calls[0][0]).toContain('Gastos por categoria');
   });
 });
 

@@ -7,6 +7,7 @@ import { TransactionRepository } from '../repositories/TransactionRepository';
 import { EventRepository } from '../repositories/EventRepository';
 import { ConversationRepository } from '../repositories/ConversationRepository';
 import { FeedbackRepository } from '../repositories/FeedbackRepository';
+import { CapabilityGapRepository } from '../repositories/CapabilityGapRepository';
 import { OnboardingHandler } from '../handlers/OnboardingHandler';
 import { ExpenseHandler } from '../handlers/ExpenseHandler';
 import { QueryHandler } from '../handlers/QueryHandler';
@@ -20,6 +21,7 @@ const transactionRepo = new TransactionRepository();
 const eventRepo = new EventRepository();
 const conversationRepo = new ConversationRepository();
 const feedbackRepo = new FeedbackRepository();
+const capabilityGapRepo = new CapabilityGapRepository();
 const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
 const moderationService = new ModerationService();
 const agentService = new AgentService();
@@ -27,7 +29,12 @@ const onboardingHandler = new OnboardingHandler(userRepo, eventRepo);
 const expenseHandler = new ExpenseHandler(gamificationService);
 const queryHandler = new QueryHandler(transactionRepo, eventRepo);
 const smallTalkHandler = new SmallTalkHandler();
-const agentRouter = new AgentRouter(expenseHandler, queryHandler, smallTalkHandler);
+const agentRouter = new AgentRouter(
+  expenseHandler,
+  queryHandler,
+  smallTalkHandler,
+  capabilityGapRepo
+);
 
 function modelTurnContent(action: AgentAction): string {
   switch (action.tool) {
@@ -41,16 +48,28 @@ function modelTurnContent(action: AgentAction): string {
       return 'Mostrei o resumo de gastos.';
     case 'listar_transacoes':
       return 'Mostrei a lista de transações.';
+    case 'consultar_limite_diario':
+      return 'Informei quanto ainda dá pra gastar hoje.';
+    case 'consultar_progresso':
+      return 'Mostrei o progresso (sequência, reserva e limite).';
+    case 'consultar_saldo_mensal':
+      return 'Mostrei o saldo do mês.';
     case 'remover_transacao':
       return 'Pedi confirmação para remover um gasto.';
     case 'corrigir_ultimo_gasto':
       return `Corrigi o último gasto para R$ ${action.amount.toFixed(2)}.`;
+    case 'reportar_lacuna':
+      return 'Registrei um pedido que ainda não sei atender.';
     case 'none':
       return action.text ?? '';
   }
 }
 
 export const setupBotCommands = () => {
+  bot.catch((error, ctx) => {
+    console.error(`Erro não tratado no update ${ctx.update?.update_id}:`, error);
+  });
+
   bot.start(async (ctx) => {
     const telegramId = ctx.from.id;
 
