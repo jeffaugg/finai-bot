@@ -15,6 +15,7 @@ import { SmallTalkHandler } from '../handlers/SmallTalkHandler';
 import { AgentRouter } from '../handlers/AgentRouter';
 import { message } from 'telegraf/filters';
 import { AppError } from '../types/errors';
+import { VOICE_NOT_SUPPORTED_RESPONSE, PHOTO_NOT_SUPPORTED_RESPONSE } from '../types/constants';
 
 const userRepo = new UserRepository();
 const transactionRepo = new TransactionRepository();
@@ -380,4 +381,11 @@ export const setupBotCommands = () => {
   });
 
   // TODO — Reconhecimento de voz com Whisper para transcrever áudios
+  bot.on([message('voice'), message('audio'), message('video_note')], async (ctx) => {
+    await ctx.reply(VOICE_NOT_SUPPORTED_RESPONSE);
+  });
+
+  bot.on([message('photo'), message('document')], async (ctx) => {
+    await ctx.reply(PHOTO_NOT_SUPPORTED_RESPONSE);
+  });
 };

@@ -37,6 +37,12 @@ export const HELP_RESPONSE =
 export const QUERY_NOT_IMPLEMENTED_RESPONSE =
   '🛠️ Estou aprendendo a responder esse tipo de pergunta. Por enquanto, use /status ou /historico.';
 
+export const VOICE_NOT_SUPPORTED_RESPONSE =
+  '🎙️ Ainda não consigo entender áudios, mas isso está chegando em breve! Por enquanto, me conte por texto. Ex: "gastei 40 no mercado".';
+
+export const PHOTO_NOT_SUPPORTED_RESPONSE =
+  '📷 Ainda não consigo ler imagens (como fotos de comprovantes), mas isso está chegando em breve! Por enquanto, me conte por texto. Ex: "gastei 40 no mercado".';
+
 export const CANONICAL_CATEGORIES = [
   'Alimentação',
   'Transporte',
