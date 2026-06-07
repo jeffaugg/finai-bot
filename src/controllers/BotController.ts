@@ -66,6 +66,10 @@ function modelTurnContent(action: AgentAction): string {
 }
 
 export const setupBotCommands = () => {
+  bot.catch((error, ctx) => {
+    console.error(`Erro não tratado no update ${ctx.update?.update_id}:`, error);
+  });
+
   bot.start(async (ctx) => {
     const telegramId = ctx.from.id;
 
