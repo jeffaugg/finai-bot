@@ -68,6 +68,32 @@ export class TransactionRepository {
     return this.getCategorySummary(userId, start, end);
   }
 
+  async getPeriodTotals(
+    userId: string,
+    start: Date,
+    end: Date
+  ): Promise<{ inflow: number; expense: number }> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('amount, type')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .gte('date', start.toISOString())
+      .lte('date', end.toISOString());
+
+    if (error) {
+      throw new DatabaseError(error.message);
+    }
+
+    let inflow = 0;
+    let expense = 0;
+    for (const t of data ?? []) {
+      if (t.type === 'INFLOW') inflow += Number(t.amount);
+      else if (t.type === 'EXPENSE') expense += Number(t.amount);
+    }
+    return { inflow, expense };
+  }
+
   async getCategorySummary(
     userId: string,
     start: Date,

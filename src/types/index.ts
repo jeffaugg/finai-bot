@@ -168,7 +168,7 @@ export const ClassifiedIntent = z.enum([
 
 export type ClassifiedIntent = z.infer<typeof ClassifiedIntent>;
 
-export const ClassificationPeriod = z.enum(['today', 'week', 'month', 'last_month']);
+export const ClassificationPeriod = z.enum(['today', 'yesterday', 'week', 'month', 'last_month']);
 export type ClassificationPeriod = z.infer<typeof ClassificationPeriod>;
 
 export const ClassificationSlots = z

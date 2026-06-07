@@ -66,3 +66,37 @@ describe('DateService.getCurrentLocalDateString', () => {
     expect(ds.getCurrentLocalDateString(TZ, at2359BR)).toBe('2026-05-10');
   });
 });
+
+describe('DateService.getPreviousPeriodBounds', () => {
+  const ds = new DateService(TZ);
+  const ref = new Date('2026-05-10T15:00:00Z'); // 10/mai 12h BR
+
+  it('today → ontem (dia anterior)', () => {
+    const { start, end } = ds.getPreviousPeriodBounds('today', ref);
+    expect(start.toISOString()).toBe('2026-05-09T03:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-05-10T02:59:59.999Z');
+  });
+
+  it('yesterday → anteontem', () => {
+    const { start, end } = ds.getPreviousPeriodBounds('yesterday', ref);
+    expect(start.toISOString()).toBe('2026-05-08T03:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-05-09T02:59:59.999Z');
+  });
+
+  it('week → os 7 dias anteriores à janela atual', () => {
+    const { start, end } = ds.getPreviousPeriodBounds('week', ref);
+    // janela atual = [04/mai .. 10/mai]; anterior = [27/abr .. 03/mai]
+    expect(start.toISOString()).toBe('2026-04-27T03:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-05-04T02:59:59.999Z');
+  });
+
+  it('month → mês anterior', () => {
+    const { start } = ds.getPreviousPeriodBounds('month', ref);
+    expect(start.toISOString()).toBe('2026-04-01T03:00:00.000Z');
+  });
+
+  it('last_month → mês retrasado', () => {
+    const { start } = ds.getPreviousPeriodBounds('last_month', ref);
+    expect(start.toISOString()).toBe('2026-03-01T03:00:00.000Z');
+  });
+});
