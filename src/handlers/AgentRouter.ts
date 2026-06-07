@@ -1,4 +1,5 @@
 import { Context } from 'telegraf';
+import { CapabilityGapRepository } from '../repositories/CapabilityGapRepository';
 import { AgentAction } from '../services/AgentService';
 import { Classification, User } from '../types';
 import { ExpenseHandler } from './ExpenseHandler';
@@ -9,7 +10,8 @@ export class AgentRouter {
   constructor(
     private readonly expenseHandler: ExpenseHandler,
     private readonly queryHandler: QueryHandler,
-    private readonly smallTalkHandler: SmallTalkHandler
+    private readonly smallTalkHandler: SmallTalkHandler,
+    private readonly capabilityGapRepo?: CapabilityGapRepository
   ) {}
 
   async dispatch(ctx: Context, user: User, action: AgentAction, rawText: string): Promise<void> {
@@ -42,7 +44,8 @@ export class AgentRouter {
         return this.queryHandler.summary(
           ctx,
           user,
-          clf('QUERY_SUMMARY', { period: action.period })
+          clf('QUERY_SUMMARY', { period: action.period }),
+          { incluirTransacoes: action.incluirTransacoes, incluirComparacao: action.incluirComparacao }
         );
 
       case 'listar_transacoes':
@@ -51,6 +54,15 @@ export class AgentRouter {
           user,
           clf('QUERY_LIST', { period: action.period, category: action.category })
         );
+
+      case 'consultar_limite_diario':
+        return this.queryHandler.dailyBudget(ctx, user);
+
+      case 'consultar_progresso':
+        return this.queryHandler.progress(ctx, user, action.incluirLimiteHoje);
+
+      case 'consultar_saldo_mensal':
+        return this.queryHandler.monthlyBalance(ctx, user, action.incluirBreakdown);
 
       case 'remover_transacao':
         return this.queryHandler.deleteByDescription(
@@ -61,6 +73,19 @@ export class AgentRouter {
 
       case 'corrigir_ultimo_gasto':
         return this.expenseHandler.correctLast(ctx, user, action.amount, action.category);
+
+      case 'reportar_lacuna':
+        await this.capabilityGapRepo?.record(user.id, {
+          inputText: rawText,
+          intent: action.intencao,
+          reason: action.motivo,
+          suggestion: action.sugestao,
+        });
+        await ctx.reply(
+          '🤔 Ainda não sei fazer isso, mas registrei seu pedido pra evoluir. ' +
+            'Por ora posso te ajudar com gastos, ganhos, resumos, seu limite do dia e seu progresso.'
+        );
+        return;
 
       case 'none':
         if (action.text) {

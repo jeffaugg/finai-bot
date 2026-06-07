@@ -24,13 +24,22 @@ function makeUser(): User {
 }
 
 const expenseHandler = { handle: vi.fn(), correctLast: vi.fn() };
-const queryHandler = { summary: vi.fn(), list: vi.fn(), deleteByDescription: vi.fn() };
+const queryHandler = {
+  summary: vi.fn(),
+  list: vi.fn(),
+  deleteByDescription: vi.fn(),
+  dailyBudget: vi.fn(),
+  progress: vi.fn(),
+  monthlyBalance: vi.fn(),
+};
 const smallTalkHandler = { help: vi.fn() };
+const capabilityGapRepo = { record: vi.fn() };
 
 const router = new AgentRouter(
   expenseHandler as never,
   queryHandler as never,
-  smallTalkHandler as never
+  smallTalkHandler as never,
+  capabilityGapRepo as never
 );
 
 const reply = vi.fn();
@@ -42,7 +51,11 @@ beforeEach(() => {
   queryHandler.summary.mockReset();
   queryHandler.list.mockReset();
   queryHandler.deleteByDescription.mockReset();
+  queryHandler.dailyBudget.mockReset();
+  queryHandler.progress.mockReset();
+  queryHandler.monthlyBalance.mockReset();
   smallTalkHandler.help.mockReset();
+  capabilityGapRepo.record.mockReset();
   reply.mockReset();
 });
 
@@ -101,8 +114,71 @@ describe('AgentRouter.dispatch', () => {
     expect(queryHandler.summary).toHaveBeenCalledWith(
       ctx,
       expect.anything(),
-      expect.objectContaining({ intent: 'QUERY_SUMMARY', slots: { period: 'week' } })
+      expect.objectContaining({ intent: 'QUERY_SUMMARY', slots: { period: 'week' } }),
+      expect.objectContaining({ incluirTransacoes: undefined, incluirComparacao: undefined })
     );
+  });
+
+  it('consultar_resumo repassa os sideloads para o summary', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'consultar_resumo', period: 'month', incluirTransacoes: true, incluirComparacao: true },
+      'resumo do mês com transações comparado'
+    );
+
+    expect(queryHandler.summary).toHaveBeenCalledWith(
+      ctx,
+      expect.anything(),
+      expect.anything(),
+      { incluirTransacoes: true, incluirComparacao: true }
+    );
+  });
+
+  it('consultar_limite_diario → QueryHandler.dailyBudget', async () => {
+    await router.dispatch(ctx, makeUser(), { tool: 'consultar_limite_diario' }, 'quanto posso gastar hoje?');
+
+    expect(queryHandler.dailyBudget).toHaveBeenCalledWith(ctx, expect.anything());
+  });
+
+  it('consultar_progresso → QueryHandler.progress com sideload', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'consultar_progresso', incluirLimiteHoje: true },
+      'como tá minha sequência e quanto posso gastar?'
+    );
+
+    expect(queryHandler.progress).toHaveBeenCalledWith(ctx, expect.anything(), true);
+  });
+
+  it('consultar_saldo_mensal → QueryHandler.monthlyBalance', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'consultar_saldo_mensal', incluirBreakdown: true },
+      'quanto sobrou esse mês por categoria?'
+    );
+
+    expect(queryHandler.monthlyBalance).toHaveBeenCalledWith(ctx, expect.anything(), true);
+  });
+
+  it('reportar_lacuna → grava o gap e responde', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'reportar_lacuna', intencao: 'registrar gasto de ontem', motivo: 'sem tool de data passada', sugestao: 'aceitar data no registro' },
+      'gastei 40 ontem no mercado'
+    );
+
+    expect(capabilityGapRepo.record).toHaveBeenCalledWith('u1', {
+      inputText: 'gastei 40 ontem no mercado',
+      intent: 'registrar gasto de ontem',
+      reason: 'sem tool de data passada',
+      suggestion: 'aceitar data no registro',
+    });
+    expect(reply).toHaveBeenCalledOnce();
+    expect(reply.mock.calls[0][0]).toMatch(/registrei seu pedido/i);
   });
 
   it('listar_transacoes → QueryHandler.list com período e categoria', async () => {

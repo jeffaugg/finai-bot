@@ -24,14 +24,19 @@
 | Funcionalidade | Descrição |
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
-| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover, corrigir último gasto) em uma única chamada ao Gemini |
+| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover, corrigir último gasto, limite do dia, progresso, saldo do mês) em uma única chamada ao Gemini |
+| **Tools com sideloads** | Parâmetros opt-in `incluir_*` enriquecem a resposta sob demanda (resumo + transações/comparação, progresso + limite, saldo + categorias), mantendo o caminho padrão enxuto |
 | **Conversa multi-turn** | O agente usa o histórico recente para pedir o que faltar ("gastei no mercado" → "quanto?") e dar coaching reativo após um estouro |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
-| **Resumo de gastos** | "Quanto gastei hoje/essa semana/esse mês?" com totais por categoria |
+| **Resumo de gastos** | "Quanto gastei hoje/ontem/essa semana/esse mês?" com totais por categoria |
+| **Limite do dia** | "Quanto posso gastar hoje?" responde o limite diário menos o que já foi gasto |
+| **Progresso (gamificação)** | "Como tá minha sequência?" mostra streak, reserva de sucesso e limite diário |
+| **Saldo do mês** | "Quanto sobrou esse mês?" calcula renda (salário + extras) menos gastos fixos e do mês |
 | **Listagem de transações** | "Me mostra meus gastos com lazer" com filtro e paginação |
 | **Exclusão conversacional** | "Remove meu último gasto no mercado" com confirmação inline |
 | **Confirmação de valor alto** | Gastos a partir de `HIGH_VALUE_THRESHOLD` (R$ 500) pedem confirmação inline antes de gravar |
 | **Correção do último gasto** | "Na verdade foi 80" desfaz e recria o último gasto preservando a data, registrando o evento de correção |
+| **Captura de lacunas** | Pedidos sobre finanças que nenhuma tool atende viram registro estruturado em `capability_gaps` (via `reportar_lacuna`), em vez de recusa em texto livre |
 | **Feedback do usuário** | `/feedback <texto>` grava sugestões livres como insumo qualitativo para a pesquisa |
 | **Gamificação com Streaks** | Mantenha gastos abaixo do limite diário para estender a ofensiva |
 | **Reserva de Sucesso** | Economia diária acumula como colchão para dias de maior gasto |
@@ -117,6 +122,7 @@ finai-bot/
 │   ├── handlers/
 │   ├── repositories/       
 │   ├── services/
+│   │   └── tools/          # tools do agente, agrupadas por domínio
 │   ├── types/
 │   └── utils/              
 ├── supabase/migrations/
@@ -212,15 +218,15 @@ pnpm test:coverage
 
 Os testes unitários ficam em `tests/unit/` e cobrem:
 
-- **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês, helpers de data local
+- **`DateService`** — bounds de dia/semana/mês, DST-safe, virada de mês, helpers de data local, período anterior (comparação)
 - **`ModerationService`** — heurísticas de saudação, comprimento, off-topic
-- **`AgentService`** — function calling do Gemini: mapeia cada tool, valida args com Zod, fallback para `none`
-- **`AgentRouter`** — despacho correto de cada tool para o handler
+- **`AgentService`** — function calling do Gemini: mapeia cada tool (incl. sideloads e `reportar_lacuna`), valida args com Zod, fallback para `none`
+- **`AgentRouter`** — despacho correto de cada tool para o handler (incl. limite/progresso/saldo e captura de lacuna)
 - **`ExpenseHandler`** — confirmação de valor alto e correção do último gasto
 - **`GamificationService`** — fechamento diário (3 desfechos, idempotência, dias pulados), emissão de eventos, correção e status
 - **`OnboardingHandler`** — todas as 5 transições de estado
-- **`QueryHandler`** — resumo, listagem, exclusão por descrição
-- **Repositórios** — `EventRepository` (append-only best-effort), `SnapshotRepository` (idempotência por data), `ConversationRepository` (janela recente), `FeedbackRepository`
+- **`QueryHandler`** — resumo (com sideloads), listagem, exclusão, limite do dia, progresso, saldo mensal
+- **Repositórios** — `EventRepository` (append-only best-effort), `SnapshotRepository` (idempotência por data), `ConversationRepository` (janela recente), `FeedbackRepository`, `CapabilityGapRepository` (captura de lacunas best-effort)
 - **`retry` / `auth`** — backoff exponencial do `withRetry` e autorização de webhook/cron
 - **`parse`** — parseAmount e parsePercentage com variantes BR
 
