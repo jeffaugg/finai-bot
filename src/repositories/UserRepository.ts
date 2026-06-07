@@ -56,7 +56,7 @@ export class UserRepository {
       throw new DatabaseError(error.message);
     }
 
-    return (data ?? []).map((u) => UserSchema.parse(u));
+    return ((data ?? []) as unknown[]).map((user) => UserSchema.parse(user));
   }
 
   async findUsersWithoutTodayExpenses(): Promise<User[]> {
@@ -82,11 +82,13 @@ export class UserRepository {
       .gte('date', start.toISOString())
       .lte('date', end.toISOString());
 
-    const usersWithExpenses = new Set((todayExpenses ?? []).map((t) => t.user_id));
+    const usersWithExpenses = new Set(
+      ((todayExpenses ?? []) as Array<{ user_id: string }>).map((transaction) => transaction.user_id)
+    );
 
     return (users ?? [])
-      .filter((u) => !usersWithExpenses.has(u.id))
-      .map((u) => UserSchema.parse(u));
+      .filter((user) => !usersWithExpenses.has(user.id))
+      .map((user) => UserSchema.parse(user));
   }
 
   async findStaleOnboardingForNudge(hoursAgo: number): Promise<User[]> {
@@ -103,7 +105,7 @@ export class UserRepository {
       throw new DatabaseError(error.message);
     }
 
-    return (data ?? []).map((u) => UserSchema.parse(u));
+    return ((data ?? []) as unknown[]).map((user) => UserSchema.parse(user));
   }
 
   async markOnboardingNudged(userId: string): Promise<void> {

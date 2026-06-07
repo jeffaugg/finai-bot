@@ -381,11 +381,23 @@ export const setupBotCommands = () => {
   });
 
   // TODO — Reconhecimento de voz com Whisper para transcrever áudios
-  bot.on([message('voice'), message('audio'), message('video_note')], async (ctx) => {
+  bot.on(message('voice'), async (ctx) => {
     await ctx.reply(VOICE_NOT_SUPPORTED_RESPONSE);
   });
 
-  bot.on([message('photo'), message('document')], async (ctx) => {
+  bot.on(message('audio'), async (ctx) => {
+    await ctx.reply(VOICE_NOT_SUPPORTED_RESPONSE);
+  });
+
+  bot.on(message('video_note'), async (ctx) => {
+    await ctx.reply(VOICE_NOT_SUPPORTED_RESPONSE);
+  });
+
+  bot.on(message('photo'), async (ctx) => {
+    await ctx.reply(PHOTO_NOT_SUPPORTED_RESPONSE);
+  });
+
+  bot.on(message('document'), async (ctx) => {
     await ctx.reply(PHOTO_NOT_SUPPORTED_RESPONSE);
   });
 };

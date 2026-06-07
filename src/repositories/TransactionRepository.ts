@@ -56,7 +56,10 @@ export class TransactionRepository {
       throw new DatabaseError(error.message);
     }
 
-    return (data ?? []).reduce((acc, curr) => acc + Number(curr.amount), 0);
+    return ((data ?? []) as Array<{ amount: number | string }>).reduce(
+      (accumulator, current) => accumulator + Number(current.amount),
+      0
+    );
   }
 
   async getMonthlySummary(
@@ -87,9 +90,9 @@ export class TransactionRepository {
 
     let inflow = 0;
     let expense = 0;
-    for (const t of data ?? []) {
-      if (t.type === 'INFLOW') inflow += Number(t.amount);
-      else if (t.type === 'EXPENSE') expense += Number(t.amount);
+    for (const transaction of (data ?? []) as Array<{ amount: number | string; type: 'INFLOW' | 'EXPENSE' }>) {
+      if (transaction.type === 'INFLOW') inflow += Number(transaction.amount);
+      else if (transaction.type === 'EXPENSE') expense += Number(transaction.amount);
     }
     return { inflow, expense };
   }
@@ -113,8 +116,11 @@ export class TransactionRepository {
     }
 
     const totals = new Map<string, number>();
-    for (const t of data ?? []) {
-      totals.set(t.category, (totals.get(t.category) ?? 0) + Number(t.amount));
+    for (const transaction of (data ?? []) as Array<{ category: string; amount: number | string }>) {
+      totals.set(
+        transaction.category,
+        (totals.get(transaction.category) ?? 0) + Number(transaction.amount)
+      );
     }
 
     return Array.from(totals.entries())
