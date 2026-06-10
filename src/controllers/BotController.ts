@@ -42,38 +42,17 @@ const agentRouter = new AgentRouter(
 );
 
 function modelTurnContent(action: AgentAction): string {
-  switch (action.tool) {
-    case 'registrar_gasto':
-      return `Registrei um gasto de R$ ${action.amount.toFixed(2)} em ${action.category}.`;
-    case 'registrar_entrada':
-      return `Registrei uma entrada de R$ ${action.amount.toFixed(2)}.`;
-    case 'atualizar_salario':
-      return `Atualizei o salário para R$ ${action.amount.toFixed(2)}.`;
-    case 'atualizar_gastos_fixos':
-      return `Atualizei os gastos fixos para R$ ${action.amount.toFixed(2)}.`;
-    case 'atualizar_percentual_poupanca':
-      return `Atualizei a meta de poupança para ${action.percent}%.`;
-    case 'configurar_lembretes':
-      return action.ativar ? 'Ativei os lembretes diários.' : 'Desativei os lembretes diários.';
-    case 'consultar_resumo':
-      return 'Mostrei o resumo de gastos.';
-    case 'listar_transacoes':
-      return 'Mostrei a lista de transações.';
-    case 'consultar_limite_diario':
-      return 'Informei quanto ainda dá pra gastar hoje.';
-    case 'consultar_progresso':
-      return 'Mostrei o progresso (sequência, reserva e limite).';
-    case 'consultar_saldo_mensal':
-      return 'Mostrei o saldo do mês.';
-    case 'remover_transacao':
-      return 'Pedi confirmação para remover um gasto.';
-    case 'corrigir_ultimo_gasto':
-      return `Corrigi o último gasto para R$ ${action.amount.toFixed(2)}.`;
-    case 'reportar_lacuna':
-      return 'Registrei um pedido que ainda não sei atender.';
-    case 'none':
-      return action.text ?? '';
+  if (action.tool === 'none') {
+    return action.text ?? '';
   }
+
+  const { tool, ...args } = action;
+  const argString = Object.entries(args)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}=${typeof value === 'string' ? `"${value}"` : value}`)
+    .join(', ');
+
+  return `[ferramenta executada: ${tool}(${argString})]`;
 }
 
 export const setupBotCommands = () => {
@@ -376,11 +355,13 @@ export const setupBotCommands = () => {
 
     try {
       const history = await conversationRepo.recentWindow(user.id);
-      const action = await agentService.interpret(userText, history);
-      await agentRouter.dispatch(ctx, user, action, userText);
+      const actions = await agentService.interpret(userText, history);
+      for (const action of actions) {
+        await agentRouter.dispatch(ctx, user, action, userText);
+      }
 
       await conversationRepo.append(user.id, 'user', userText);
-      const modelTurn = modelTurnContent(action);
+      const modelTurn = actions.map(modelTurnContent).filter(Boolean).join('\n');
       if (modelTurn) {
         await conversationRepo.append(user.id, 'model', modelTurn);
       }
