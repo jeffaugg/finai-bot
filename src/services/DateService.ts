@@ -112,6 +112,11 @@ export class DateService {
     return { start, end };
   }
 
+  getLocalNoon(dateStr: string, timezone: string = this.defaultTimezone): Date {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return zonedTimeToUtc({ year, month, day, hour: 12, minute: 0, second: 0 }, timezone);
+  }
+
   getCurrentLocalDateString(timezone: string = this.defaultTimezone, ref: Date = new Date()): string {
     const p = getZonedParts(ref, timezone);
     return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;

@@ -1,5 +1,6 @@
 import { bot } from '../config/clients';
 import { AgentService, AgentAction } from '../services/AgentService';
+import { DateService } from '../services/DateService';
 import { GamificationService } from '../services/GamificationService';
 import { ModerationService } from '../services/ModerationService';
 import { UserRepository } from '../repositories/UserRepository';
@@ -24,6 +25,7 @@ const conversationRepo = new ConversationRepository();
 const feedbackRepo = new FeedbackRepository();
 const capabilityGapRepo = new CapabilityGapRepository();
 const gamificationService = new GamificationService(userRepo, transactionRepo, eventRepo);
+const dateService = new DateService();
 const moderationService = new ModerationService();
 const agentService = new AgentService();
 const onboardingHandler = new OnboardingHandler(userRepo, eventRepo);
@@ -34,7 +36,9 @@ const agentRouter = new AgentRouter(
   expenseHandler,
   queryHandler,
   smallTalkHandler,
-  capabilityGapRepo
+  capabilityGapRepo,
+  userRepo,
+  eventRepo
 );
 
 function modelTurnContent(action: AgentAction): string {
@@ -45,6 +49,12 @@ function modelTurnContent(action: AgentAction): string {
       return `Registrei uma entrada de R$ ${action.amount.toFixed(2)}.`;
     case 'atualizar_salario':
       return `Atualizei o salário para R$ ${action.amount.toFixed(2)}.`;
+    case 'atualizar_gastos_fixos':
+      return `Atualizei os gastos fixos para R$ ${action.amount.toFixed(2)}.`;
+    case 'atualizar_percentual_poupanca':
+      return `Atualizei a meta de poupança para ${action.percent}%.`;
+    case 'configurar_lembretes':
+      return action.ativar ? 'Ativei os lembretes diários.' : 'Desativei os lembretes diários.';
     case 'consultar_resumo':
       return 'Mostrei o resumo de gastos.';
     case 'listar_transacoes':
@@ -244,9 +254,10 @@ export const setupBotCommands = () => {
     }
   });
 
-  bot.action(/^confirm_expense:(\d+(?:\.\d+)?):(.+)$/, async (ctx) => {
+  bot.action(/^confirm_expense:(\d+(?:\.\d+)?):(.+?)(?::(\d{4}-\d{2}-\d{2}))?$/, async (ctx) => {
     const amount = Number(ctx.match[1]);
     const category = ctx.match[2];
+    const localDate = ctx.match[3];
 
     try {
       const user = await userRepo.findByTelegramId(ctx.from.id);
@@ -257,7 +268,12 @@ export const setupBotCommands = () => {
 
       const result = await gamificationService.processFinancialEvent(
         user.telegram_id,
-        { intent: 'EXPENSE', amount, category },
+        {
+          intent: 'EXPENSE',
+          amount,
+          category,
+          date: localDate ? dateService.getLocalNoon(localDate) : undefined,
+        },
         `${category} (R$ ${amount.toFixed(2)})`
       );
       await ctx.editMessageText(result.message);

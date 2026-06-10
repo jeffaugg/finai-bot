@@ -8,7 +8,32 @@ const lacunaSchema = z.object({
   sugestao: z.string().min(1),
 });
 
+const lembretesSchema = z.object({ ativar: z.boolean() });
+
 export const sistemaTools: ToolModule[] = [
+  {
+    declaration: {
+      name: 'configurar_lembretes',
+      description:
+        'Liga ou desliga os lembretes diários do bot. ' +
+        'Ex: "para de me lembrar", "desativa as notificações", "pode voltar a me lembrar".',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          ativar: {
+            type: Type.BOOLEAN,
+            description: 'true para ativar os lembretes, false para desativar.',
+          },
+        },
+        required: ['ativar'],
+      },
+    },
+    routingHint: '- ligar/desligar lembretes diários → configurar_lembretes',
+    parse(args) {
+      const p = lembretesSchema.safeParse(args);
+      return p.success ? { tool: 'configurar_lembretes', ...p.data } : null;
+    },
+  },
   {
     declaration: {
       name: 'reportar_lacuna',

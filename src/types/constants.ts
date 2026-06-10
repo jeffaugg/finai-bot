@@ -25,10 +25,11 @@ export const OFF_TOPIC_RESPONSE =
 
 export const HELP_RESPONSE =
   '🤖 *Como eu funciono:*\n\n' +
-  '• Me conte um gasto: "gastei 40 no mercado"\n' +
+  '• Me conte um gasto: "gastei 40 no mercado" (ou "ontem gastei 25 na padaria")\n' +
   '• Me conte um ganho extra: "recebi 200 de bônus"\n' +
-  '• Atualize seu salário: "meu salário agora é 4000"\n' +
-  '• Peça um resumo: "quanto gastei hoje?"\n\n' +
+  '• Atualize seu perfil: "meu salário agora é 4000", "minhas contas fixas são 1200", "quero poupar 30%"\n' +
+  '• Peça um resumo: "quanto gastei hoje?"\n' +
+  '• Controle os lembretes: "para de me lembrar"\n\n' +
   'Comandos disponíveis:\n' +
   '/status — seu progresso atual\n' +
   '/historico — últimos 3 meses\n' +

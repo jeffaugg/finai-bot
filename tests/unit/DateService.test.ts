@@ -67,6 +67,13 @@ describe('DateService.getCurrentLocalDateString', () => {
   });
 });
 
+describe('DateService.getLocalNoon', () => {
+  it('converte o meio-dia local de São Paulo para UTC', () => {
+    const ds = new DateService(TZ);
+    expect(ds.getLocalNoon('2026-06-08').toISOString()).toBe('2026-06-08T15:00:00.000Z');
+  });
+});
+
 describe('DateService.getPreviousPeriodBounds', () => {
   const ds = new DateService(TZ);
   const ref = new Date('2026-05-10T15:00:00Z'); // 10/mai 12h BR

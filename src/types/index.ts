@@ -83,6 +83,8 @@ export const UserEventType = z.enum([
   'onboarding_nudge_sent',
   'salary_updated',
   'transaction_corrected',
+  'profile_updated',
+  'reminders_toggled',
 ]);
 
 export type UserEventType = z.infer<typeof UserEventType>;
@@ -147,7 +149,9 @@ export const GeminiExtractionSchema = z.object({
   ),
 });
 
-export type GeminiExtraction = z.infer<typeof GeminiExtractionSchema>;
+export type GeminiExtraction = z.infer<typeof GeminiExtractionSchema> & {
+  date?: Date;
+};
 
 export interface FinancialEventResult {
   message: string;

@@ -23,7 +23,12 @@ function makeUser(): User {
   };
 }
 
-const expenseHandler = { handle: vi.fn(), correctLast: vi.fn() };
+const expenseHandler = {
+  handle: vi.fn(),
+  correctLast: vi.fn(),
+  updateFixedExpenses: vi.fn(),
+  updateSavingPercentage: vi.fn(),
+};
 const queryHandler = {
   summary: vi.fn(),
   list: vi.fn(),
@@ -34,12 +39,16 @@ const queryHandler = {
 };
 const smallTalkHandler = { help: vi.fn() };
 const capabilityGapRepo = { record: vi.fn() };
+const userRepo = { updateUser: vi.fn() };
+const eventRepo = { record: vi.fn() };
 
 const router = new AgentRouter(
   expenseHandler as never,
   queryHandler as never,
   smallTalkHandler as never,
-  capabilityGapRepo as never
+  capabilityGapRepo as never,
+  userRepo as never,
+  eventRepo as never
 );
 
 const reply = vi.fn();
@@ -48,6 +57,10 @@ const ctx = { reply } as never;
 beforeEach(() => {
   expenseHandler.handle.mockReset();
   expenseHandler.correctLast.mockReset();
+  expenseHandler.updateFixedExpenses.mockReset();
+  expenseHandler.updateSavingPercentage.mockReset();
+  userRepo.updateUser.mockReset();
+  eventRepo.record.mockReset();
   queryHandler.summary.mockReset();
   queryHandler.list.mockReset();
   queryHandler.deleteByDescription.mockReset();
@@ -74,6 +87,55 @@ describe('AgentRouter.dispatch', () => {
       { intent: 'EXPENSE', amount: 40, category: 'Alimentação' },
       'gastei 40'
     );
+  });
+
+  it('registrar_gasto com dia "ontem" → extraction com data de ontem', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'registrar_gasto', amount: 25, category: 'Alimentação', dia: 'ontem' },
+      'ontem gastei 25 na padaria'
+    );
+
+    const extraction = expenseHandler.handle.mock.calls[0][2];
+    expect(extraction.date).toBeInstanceOf(Date);
+    expect(extraction.date.getTime()).toBeLessThan(Date.now());
+  });
+
+  it('atualizar_gastos_fixos → ExpenseHandler.updateFixedExpenses', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'atualizar_gastos_fixos', amount: 1200 },
+      'minhas contas fixas são 1200'
+    );
+
+    expect(expenseHandler.updateFixedExpenses).toHaveBeenCalledWith(ctx, expect.anything(), 1200);
+  });
+
+  it('atualizar_percentual_poupanca → ExpenseHandler.updateSavingPercentage', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'atualizar_percentual_poupanca', percent: 30 },
+      'quero poupar 30%'
+    );
+
+    expect(expenseHandler.updateSavingPercentage).toHaveBeenCalledWith(ctx, expect.anything(), 30);
+  });
+
+  it('configurar_lembretes → atualiza reminders_enabled e responde', async () => {
+    await router.dispatch(
+      ctx,
+      makeUser(),
+      { tool: 'configurar_lembretes', ativar: false },
+      'para de me lembrar'
+    );
+
+    expect(userRepo.updateUser).toHaveBeenCalledWith('u1', { reminders_enabled: false });
+    expect(eventRepo.record).toHaveBeenCalledWith('u1', 'reminders_toggled', { enabled: false });
+    expect(reply).toHaveBeenCalledOnce();
+    expect(reply.mock.calls[0][0]).toMatch(/desativados/i);
   });
 
   it('registrar_entrada → ExpenseHandler com intent INFLOW', async () => {

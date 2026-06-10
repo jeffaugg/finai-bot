@@ -3,9 +3,12 @@ import { ClassificationPeriod } from '../../types';
 import { CANONICAL_CATEGORIES } from '../../types/constants';
 
 export type AgentAction =
-  | { tool: 'registrar_gasto'; amount: number; category: string }
+  | { tool: 'registrar_gasto'; amount: number; category: string; dia?: 'hoje' | 'ontem' }
   | { tool: 'registrar_entrada'; amount: number; category: string }
   | { tool: 'atualizar_salario'; amount: number }
+  | { tool: 'atualizar_gastos_fixos'; amount: number }
+  | { tool: 'atualizar_percentual_poupanca'; percent: number }
+  | { tool: 'configurar_lembretes'; ativar: boolean }
   | {
       tool: 'consultar_resumo';
       period?: ClassificationPeriod;

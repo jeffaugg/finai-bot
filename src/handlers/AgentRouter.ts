@@ -1,28 +1,40 @@
 import { Context } from 'telegraf';
 import { CapabilityGapRepository } from '../repositories/CapabilityGapRepository';
+import { EventRepository } from '../repositories/EventRepository';
+import { UserRepository } from '../repositories/UserRepository';
 import { AgentAction } from '../services/AgentService';
+import { DateService } from '../services/DateService';
 import { Classification, User } from '../types';
 import { ExpenseHandler } from './ExpenseHandler';
 import { QueryHandler } from './QueryHandler';
 import { SmallTalkHandler } from './SmallTalkHandler';
+
+const dateService = new DateService();
 
 export class AgentRouter {
   constructor(
     private readonly expenseHandler: ExpenseHandler,
     private readonly queryHandler: QueryHandler,
     private readonly smallTalkHandler: SmallTalkHandler,
-    private readonly capabilityGapRepo?: CapabilityGapRepository
+    private readonly capabilityGapRepo?: CapabilityGapRepository,
+    private readonly userRepo?: UserRepository,
+    private readonly eventRepo?: EventRepository
   ) {}
 
   async dispatch(ctx: Context, user: User, action: AgentAction, rawText: string): Promise<void> {
     switch (action.tool) {
-      case 'registrar_gasto':
+      case 'registrar_gasto': {
+        const date =
+          action.dia === 'ontem'
+            ? dateService.getLocalNoon(dateService.addDays(dateService.getCurrentLocalDateString(), -1))
+            : undefined;
         return this.expenseHandler.handle(
           ctx,
           user,
-          { intent: 'EXPENSE', amount: action.amount, category: action.category },
+          { intent: 'EXPENSE', amount: action.amount, category: action.category, date },
           rawText
         );
+      }
 
       case 'registrar_entrada':
         return this.expenseHandler.handle(
@@ -39,6 +51,26 @@ export class AgentRouter {
           { intent: 'UPDATE_SALARY', amount: action.amount, category: 'Salário' },
           rawText
         );
+
+      case 'atualizar_gastos_fixos':
+        return this.expenseHandler.updateFixedExpenses(ctx, user, action.amount);
+
+      case 'atualizar_percentual_poupanca':
+        return this.expenseHandler.updateSavingPercentage(ctx, user, action.percent);
+
+      case 'configurar_lembretes': {
+        if (!this.userRepo) {
+          return this.smallTalkHandler.help(ctx);
+        }
+        await this.userRepo.updateUser(user.id, { reminders_enabled: action.ativar });
+        await this.eventRepo?.record(user.id, 'reminders_toggled', { enabled: action.ativar });
+        await ctx.reply(
+          action.ativar
+            ? '🔔 Lembretes ativados! Vou te lembrar de registrar seus gastos.'
+            : '🔕 Lembretes desativados. Quando quiser, é só pedir pra eu voltar a te lembrar.'
+        );
+        return;
+      }
 
       case 'consultar_resumo':
         return this.queryHandler.summary(

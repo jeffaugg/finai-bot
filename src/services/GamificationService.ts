@@ -91,12 +91,11 @@ export class GamificationService {
     data: GeminiExtraction
   ): Promise<FinancialEventResult> {
     const novaRenda = data.amount;
-    const despesasFixas = Number(user.fixed_expenses);
-    const porcentagemEconomia = Number(user.saving_percentage);
-
-    const rendaDisponivel = novaRenda - despesasFixas;
-    const valorParaGastarMes = rendaDisponivel * (1 - porcentagemEconomia / 100);
-    const novoLimiteDiario = valorParaGastarMes / 30;
+    const novoLimiteDiario = calculateDailyLimit(
+      novaRenda,
+      Number(user.fixed_expenses),
+      Number(user.saving_percentage)
+    );
 
     await this.userRepo.updateUser(user.id, {
       monthly_income: novaRenda,
@@ -115,6 +114,56 @@ export class GamificationService {
     };
   }
 
+  async updateFixedExpenses(user: User, amount: number): Promise<FinancialEventResult> {
+    const novoLimiteDiario = calculateDailyLimit(
+      Number(user.monthly_income),
+      amount,
+      Number(user.saving_percentage)
+    );
+
+    await this.userRepo.updateUser(user.id, {
+      fixed_expenses: amount,
+      daily_limit: novoLimiteDiario,
+    });
+
+    await this.eventRepo?.record(user.id, 'profile_updated', {
+      field: 'fixed_expenses',
+      value: amount,
+      daily_limit: novoLimiteDiario,
+    });
+
+    return {
+      message:
+        `🏠 Gastos fixos atualizados para R$ ${amount.toFixed(2)}!\n` +
+        `Seu novo limite diário recalculado é R$ ${novoLimiteDiario.toFixed(2)}.`,
+    };
+  }
+
+  async updateSavingPercentage(user: User, percent: number): Promise<FinancialEventResult> {
+    const novoLimiteDiario = calculateDailyLimit(
+      Number(user.monthly_income),
+      Number(user.fixed_expenses),
+      percent
+    );
+
+    await this.userRepo.updateUser(user.id, {
+      saving_percentage: percent,
+      daily_limit: novoLimiteDiario,
+    });
+
+    await this.eventRepo?.record(user.id, 'profile_updated', {
+      field: 'saving_percentage',
+      value: percent,
+      daily_limit: novoLimiteDiario,
+    });
+
+    return {
+      message:
+        `🎯 Meta de poupança atualizada para ${percent}% da renda!\n` +
+        `Seu novo limite diário recalculado é R$ ${novoLimiteDiario.toFixed(2)}.`,
+    };
+  }
+
   private async handleExpense(
     user: User,
     data: GeminiExtraction,
@@ -126,7 +175,7 @@ export class GamificationService {
       category: data.category,
       type: 'EXPENSE',
       raw_text: rawText,
-      date: new Date(),
+      date: data.date ?? new Date(),
       deleted_at: null,
     });
 
@@ -135,7 +184,17 @@ export class GamificationService {
       amount: data.amount,
       category: data.category,
       type: 'EXPENSE',
+      ...(data.date ? { transaction_date: data.date.toISOString() } : {}),
     });
+
+    if (data.date) {
+      return {
+        message:
+          `🛒 ${data.category}: R$ ${data.amount.toFixed(2)} registrados pra ontem!\n` +
+          `Esse gasto não altera seu limite de hoje.`,
+        transactionId: transaction.id,
+      };
+    }
 
     const totalGastoHoje = await this.transactionRepo.getDailyExpenseTotal(user.id);
     const limiteRestante = Number(user.daily_limit) - totalGastoHoje;
@@ -330,6 +389,16 @@ export class GamificationService {
     const totalGastoHoje = await this.transactionRepo.getDailyExpenseTotal(user.id);
     return formatStatus(user, totalGastoHoje);
   }
+}
+
+export function calculateDailyLimit(
+  monthlyIncome: number,
+  fixedExpenses: number,
+  savingPercentage: number
+): number {
+  const rendaDisponivel = monthlyIncome - fixedExpenses;
+  const valorParaGastarMes = rendaDisponivel * (1 - savingPercentage / 100);
+  return valorParaGastarMes / 30;
 }
 
 export function formatBudget(user: User, totalGastoHoje: number): string {

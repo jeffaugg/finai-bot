@@ -110,7 +110,7 @@ describe('AgentService.interpret', () => {
     mockCall('registrar_gasto', { amount: 10, category: 'Outros' });
     await svc.interpret('gastei 10');
     const config = generateContent.mock.calls[0][0].config;
-    expect(config.tools[0].functionDeclarations).toHaveLength(11);
+    expect(config.tools[0].functionDeclarations).toHaveLength(14);
   });
 
   it('mapeia corrigir_ultimo_gasto sem categoria', async () => {
