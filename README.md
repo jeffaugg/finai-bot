@@ -24,11 +24,16 @@
 | Funcionalidade | Descrição |
 |---|---|
 | **Extração via NLP** | Detecta gastos, entradas e atualizações de salário a partir de texto livre |
-| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário, consultar/listar/remover, corrigir último gasto, limite do dia, progresso, saldo do mês) em uma única chamada ao Gemini |
+| **Function calling** | `AgentService` interpreta a mensagem e escolhe a ferramenta (registrar gasto/entrada, atualizar salário/gastos fixos/poupança, consultar/listar/remover, corrigir último gasto, limite do dia, progresso, saldo do mês, lembretes) em uma única chamada ao Gemini |
+| **Múltiplos registros por frase** | "Gastei 20 no uber e 30 no mercado" vira duas transações (todas as function calls são despachadas em sequência) |
+| **Anti-alucinação de confirmação** | Histórico em notação de ferramenta + retry forçando tool quando o modelo alega ter registrado sem chamar a ferramenta — confirmação falsa nunca chega ao usuário |
 | **Tools com sideloads** | Parâmetros opt-in `incluir_*` enriquecem a resposta sob demanda (resumo + transações/comparação, progresso + limite, saldo + categorias), mantendo o caminho padrão enxuto |
 | **Conversa multi-turn** | O agente usa o histórico recente para pedir o que faltar ("gastei no mercado" → "quanto?") e dar coaching reativo após um estouro |
 | **Onboarding guiado** | State machine de 5 etapas via `onboarding_step` no banco de dados |
 | **Resumo de gastos** | "Quanto gastei hoje/ontem/essa semana/esse mês?" com totais por categoria |
+| **Gasto retroativo (ontem)** | "Ontem gastei 25 na padaria" registra com a data de ontem (computada no servidor), sem afetar o limite de hoje |
+| **Perfil financeiro editável** | "Minhas contas fixas são 1200" / "quero poupar 30%" atualizam o perfil e recalculam o limite diário |
+| **Controle de lembretes no chat** | "Para de me lembrar" / "pode voltar a me lembrar" liga/desliga os lembretes diários |
 | **Limite do dia** | "Quanto posso gastar hoje?" responde o limite diário menos o que já foi gasto |
 | **Progresso (gamificação)** | "Como tá minha sequência?" mostra streak, reserva de sucesso e limite diário |
 | **Saldo do mês** | "Quanto sobrou esse mês?" calcula renda (salário + extras) menos gastos fixos e do mês |
