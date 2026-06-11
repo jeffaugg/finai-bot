@@ -8,7 +8,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "start": "ts-node local.ts",
-    "migrate": "ts-node scripts/migrate.ts"
+    "migrate": "ts-node scripts/migrate.ts",
+    "repair:snapshots": "ts-node scripts/repair-snapshots.ts"
   },
   "keywords": [],
   "author": "",

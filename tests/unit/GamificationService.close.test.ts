@@ -62,6 +62,7 @@ describe('GamificationService.closeDay', () => {
     const result = await svc.closeDay(makeUser(), '2026-05-20');
 
     expect(result?.state).toEqual({ success_reserve: 30, current_streak: 1, max_streak: 1 });
+    expect(result?.message).toContain('Dia 20/05');
     expect(snapshotRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ close_result: 'success', total_spent: 50, had_activity: true })
     );
@@ -70,6 +71,19 @@ describe('GamificationService.closeDay', () => {
       'daily_closed',
       expect.objectContaining({ close_result: 'success', snapshot_date: '2026-05-20' })
     );
+  });
+
+  it('recusa fechar o dia corrente ou futuro (dia ainda em andamento)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-20T15:00:00Z'));
+    txRepo.getDailyExpenseTotal.mockResolvedValue(50);
+
+    expect(await svc.closeDay(makeUser(), '2026-05-20')).toBeNull();
+    expect(await svc.closeDay(makeUser(), '2026-05-21')).toBeNull();
+
+    expect(snapshotRepo.insert).not.toHaveBeenCalled();
+    expect(userRepo.updateUser).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('dia inativo (sem gastos) conta como sucesso', async () => {
@@ -200,7 +214,7 @@ describe('GamificationService.closePendingDays', () => {
     vi.useRealTimers();
   });
 
-  it('recupera dias pulados em ordem, com streak progredindo', async () => {
+  it('fecha apenas dias completos, até ontem (nunca o dia corrente)', async () => {
     txRepo.getDailyExpenseTotal.mockResolvedValue(0);
 
     const message = await svc.closePendingDays(
@@ -208,21 +222,36 @@ describe('GamificationService.closePendingDays', () => {
     );
 
     const dias = snapshotRepo.insert.mock.calls.map((c) => (c[0] as DailySnapshotInput).snapshot_date);
-    expect(dias).toEqual(['2026-05-22', '2026-05-23', '2026-05-24']);
+    expect(dias).toEqual(['2026-05-22', '2026-05-23']);
 
     const streaks = snapshotRepo.insert.mock.calls.map((c) => (c[0] as DailySnapshotInput).current_streak);
-    expect(streaks).toEqual([1, 2, 3]);
+    expect(streaks).toEqual([1, 2]);
 
-    expect(message).toContain('Dia fechado com sucesso');
+    expect(message).toContain('Dia 23/05 fechado com sucesso');
   });
 
-  it('não fecha nada quando o último fechamento já é hoje', async () => {
+  it('não fecha nada quando o último fechamento já é ontem', async () => {
     const message = await svc.closePendingDays(
-      makeUser({ last_closed_date: new Date('2026-05-24') })
+      makeUser({ last_closed_date: new Date('2026-05-23') })
     );
 
     expect(message).toBeNull();
     expect(snapshotRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('regressão: cron disparado logo após a meia-noite fecha ontem, não o dia novo', async () => {
+    vi.setSystemTime(new Date('2026-05-25T03:05:00Z'));
+    txRepo.getDailyExpenseTotal.mockResolvedValue(9);
+
+    await svc.closePendingDays(makeUser({ last_closed_date: new Date('2026-05-23') }));
+
+    const dias = snapshotRepo.insert.mock.calls.map(
+      (c) => (c[0] as DailySnapshotInput).snapshot_date
+    );
+    expect(dias).toEqual(['2026-05-24']);
+    expect(snapshotRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ total_spent: 9 })
+    );
   });
 
   it('acumula a reserva ao longo dos dias recuperados', async () => {
@@ -233,18 +262,29 @@ describe('GamificationService.closePendingDays', () => {
     const reservas = snapshotRepo.insert.mock.calls.map(
       (c) => (c[0] as DailySnapshotInput).success_reserve
     );
-    expect(reservas).toEqual([80, 160, 240]);
+    expect(reservas).toEqual([80, 160]);
   });
 
-  it('usuário novo (sem last_closed_date) fecha apenas hoje', async () => {
+  it('usuário sem last_closed_date fecha do dia de criação até ontem', async () => {
     txRepo.getDailyExpenseTotal.mockResolvedValue(0);
 
-    const message = await svc.closePendingDays(makeUser({ last_closed_date: null }));
+    const message = await svc.closePendingDays(
+      makeUser({ last_closed_date: null, created_at: new Date('2026-05-22T18:00:00Z') })
+    );
 
     const dias = snapshotRepo.insert.mock.calls.map(
       (c) => (c[0] as DailySnapshotInput).snapshot_date
     );
-    expect(dias).toEqual(['2026-05-24']);
-    expect(message).toContain('Dia fechado com sucesso');
+    expect(dias).toEqual(['2026-05-22', '2026-05-23']);
+    expect(message).toContain('fechado com sucesso');
+  });
+
+  it('usuário criado hoje não fecha nada', async () => {
+    const message = await svc.closePendingDays(
+      makeUser({ last_closed_date: null, created_at: new Date('2026-05-24T11:00:00Z') })
+    );
+
+    expect(message).toBeNull();
+    expect(snapshotRepo.insert).not.toHaveBeenCalled();
   });
 });

@@ -18,8 +18,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      await bot.handleUpdate(req.body);
-      
+      const update = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      console.log(
+        'Webhook update recebido:',
+        JSON.stringify({
+          update_id: update?.update_id,
+          keys: update ? Object.keys(update) : [],
+        })
+      );
+
+      await bot.handleUpdate(update);
+
       return res.status(200).send('OK');
     } catch (error) {
       console.error('Erro crítico no processamento do webhook:', error);

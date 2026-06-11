@@ -253,12 +253,12 @@ export class GamificationService {
   }
 
   async closePendingDays(user: User): Promise<string | null> {
-    const todayStr = dateService.getCurrentLocalDateString();
+    const targetStr = dateService.addDays(dateService.getCurrentLocalDateString(), -1);
     const startStr = user.last_closed_date
       ? dateService.addDays(dateService.toDateString(user.last_closed_date), 1)
-      : todayStr;
+      : dateService.getCurrentLocalDateString(undefined, user.created_at);
 
-    if (startStr > todayStr) {
+    if (startStr > targetStr) {
       return null;
     }
 
@@ -269,7 +269,7 @@ export class GamificationService {
     };
     let lastMessage: string | null = null;
 
-    for (const dateStr of dateService.dateRange(startStr, todayStr)) {
+    for (const dateStr of dateService.dateRange(startStr, targetStr)) {
       const result = await this.closeDay({ ...user, ...state }, dateStr);
       if (result) {
         state = result.state;
@@ -284,11 +284,16 @@ export class GamificationService {
     user: User,
     dateStr: string
   ): Promise<{ message: string; state: CloseState } | null> {
+    if (dateStr >= dateService.getCurrentLocalDateString()) {
+      return null;
+    }
+
     if (await this.snapshots.existsForDate(user.id, dateStr)) {
       return null;
     }
 
     const totalGasto = await this.transactionRepo.getDailyExpenseTotal(user.id, dateStr);
+    const diaFormatado = formatLocalDateString(dateStr);
     const limite = Number(user.daily_limit);
     const reservaAtual = Number(user.success_reserve);
     const streakAtual = Number(user.current_streak);
@@ -308,7 +313,7 @@ export class GamificationService {
       closeResult = 'success';
 
       mensagem =
-        `✅ *Dia fechado com sucesso!*\n\n` +
+        `✅ *Dia ${diaFormatado} fechado com sucesso!*\n\n` +
         `Você gastou R$ ${totalGasto.toFixed(2)} de um limite de R$ ${limite.toFixed(2)}.\n` +
         `💰 Economia do dia: R$ ${surplus.toFixed(2)} → adicionados à Reserva!\n` +
         `🛡️ Reserva de Sucesso: R$ ${novaReserva.toFixed(2)}\n` +
@@ -322,7 +327,7 @@ export class GamificationService {
         closeResult = 'reserve_used';
 
         mensagem =
-          `⚠️ *Limite ultrapassado — Reserva acionada!*\n\n` +
+          `⚠️ *Dia ${diaFormatado}: limite ultrapassado — Reserva acionada!*\n\n` +
           `Você gastou R$ ${totalGasto.toFixed(2)} (R$ ${excesso.toFixed(2)} a mais).\n` +
           `🛡️ Sua Reserva de Sucesso absorveu a diferença.\n` +
           `Reserva atual: R$ ${novaReserva.toFixed(2)}\n` +
@@ -333,7 +338,7 @@ export class GamificationService {
         closeResult = 'streak_reset';
 
         mensagem =
-          `😔 *Dia difícil de fechar...*\n\n` +
+          `😔 *Dia ${diaFormatado} difícil de fechar...*\n\n` +
           `Você gastou R$ ${totalGasto.toFixed(2)} (R$ ${excesso.toFixed(2)} além do limite e da reserva).\n` +
           `Sua sequência foi resetada. Mas amanhã é um novo dia! 💪\n` +
           `🔥 Sequência: 0 dias`;
@@ -389,6 +394,11 @@ export class GamificationService {
     const totalGastoHoje = await this.transactionRepo.getDailyExpenseTotal(user.id);
     return formatStatus(user, totalGastoHoje);
   }
+}
+
+function formatLocalDateString(dateStr: string): string {
+  const [, month, day] = dateStr.split('-');
+  return `${day}/${month}`;
 }
 
 export function calculateDailyLimit(

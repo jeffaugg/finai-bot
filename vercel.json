@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/cron/daily-close",
-      "schedule": "59 2 * * *"
+      "schedule": "5 3 * * *"
     },
     {
       "path": "/api/cron/monthly-report",

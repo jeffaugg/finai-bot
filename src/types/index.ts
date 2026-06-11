@@ -85,6 +85,7 @@ export const UserEventType = z.enum([
   'transaction_corrected',
   'profile_updated',
   'reminders_toggled',
+  'snapshots_repaired',
 ]);
 
 export type UserEventType = z.infer<typeof UserEventType>;
