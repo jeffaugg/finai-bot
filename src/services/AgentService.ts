@@ -10,6 +10,10 @@ export type { AgentAction } from './tools';
 export const ACTION_CLAIM_PATTERN =
   /\b(registr(ei|ad[oa])|anot(ei|ad[oa])|atualizei|atualizad[oa]|removi|removid[oa]|apaguei|corrigi|corrigid[oa])\b/i;
 
+// O modelo às vezes imita a notação de histórico [ferramenta executada: ...]
+// como texto livre em vez de chamar a tool — tratamos como alegação de ação.
+export const TOOL_NOTATION_PATTERN = /\[ferramenta executada/i;
+
 const MAX_TOOL_CALLS = 5;
 
 const SYSTEM_INSTRUCTION =
@@ -41,11 +45,14 @@ export class AgentService {
 
     if (calls.length === 0) {
       const freeText = response.text;
-      if (!freeText || !ACTION_CLAIM_PATTERN.test(freeText)) {
+      const claimsAction =
+        !!freeText && (ACTION_CLAIM_PATTERN.test(freeText) || TOOL_NOTATION_PATTERN.test(freeText));
+      if (!claimsAction) {
         return [{ tool: 'none' as const, text: freeText }];
       }
 
-      // O modelo alegou ter executado uma ação sem chamar ferramenta: força uma tool call.
+      // O modelo alegou ter executado uma ação (texto em 1ª pessoa ou imitando a
+      // notação do histórico) sem chamar a ferramenta: força uma tool call.
       const retry = await this.generate(contents, true);
       calls = retry.functionCalls ?? [];
       if (calls.length === 0) {

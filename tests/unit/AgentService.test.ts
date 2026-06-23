@@ -312,6 +312,40 @@ describe('AgentService — guardrail anti-alucinação', () => {
     expect(actions).toEqual([{ tool: 'none' }]);
   });
 
+  it('força tool call quando o modelo imita a notação [ferramenta executada: ...] como texto', async () => {
+    generateContent
+      .mockResolvedValueOnce({
+        functionCalls: undefined,
+        text: '[ferramenta executada: registrar_gasto(amount=7, category="Alimentação")]',
+      })
+      .mockResolvedValueOnce({
+        functionCalls: [{ name: 'registrar_gasto', args: { amount: 7, category: 'Alimentação' } }],
+      });
+
+    const actions = await svc.interpret('gastei 7 reais comprando pao');
+
+    expect(actions).toEqual([{ tool: 'registrar_gasto', amount: 7, category: 'Alimentação' }]);
+    expect(generateContent).toHaveBeenCalledTimes(2);
+    const retryConfig = generateContent.mock.calls[1][0].config;
+    expect(retryConfig.toolConfig.functionCallingConfig.mode).toBe('ANY');
+  });
+
+  it('nunca vaza a notação [ferramenta executada: ...] se o retry também falhar', async () => {
+    generateContent
+      .mockResolvedValueOnce({
+        functionCalls: undefined,
+        text: '[ferramenta executada: registrar_gasto(amount=7, category="Alimentação")]',
+      })
+      .mockResolvedValueOnce({
+        functionCalls: undefined,
+        text: '[ferramenta executada: registrar_gasto(amount=7, category="Alimentação")]',
+      });
+
+    const actions = await svc.interpret('gastei 7 reais comprando pao');
+
+    expect(actions).toEqual([{ tool: 'none' }]);
+  });
+
   it('não refaz a chamada para texto livre inofensivo', async () => {
     generateContent.mockResolvedValue({ functionCalls: undefined, text: 'Quanto você gastou?' });
 
